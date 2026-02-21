@@ -1,8 +1,10 @@
 [![中文](https://img.shields.io/badge/语言-中文-red)](./README.md) ![English](https://img.shields.io/badge/Lang-English-blue) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# Personal Website Backend
+# Personal Website Admin Dashboard
 
-This project is a personal website backend management system built with Vue 3 + TypeScript + Vite, integrating the Element Plus UI library, and utilizing Tencent CloudBase SDK for data and file storage.
+This project is a personal website admin dashboard and data management system built with Vue 3 + TypeScript + Vite, integrating the Element Plus UI library, and utilizing Tencent CloudBase SDK for data and file storage.
+
+⚠️ **Note**: This is not a traditional backend server application (like a Flask/Spring project supplying APIs). It is a pure frontend Admin Dashboard / CMS used for personal website data entry, management, and visualization.
 
 ## 🔗 Project Links
 
@@ -10,9 +12,9 @@ This project is a personal website backend management system built with Vue 3 + 
 - [![Gitee](https://img.shields.io/badge/Gitee-tallmessiwu%2Fpersonal--website-C71D23?logo=gitee)](https://gitee.com/tallmessiwu/personal-website)
 - [![GitHub](https://img.shields.io/badge/GitHub-TallMessiWu%2Fpersonal--website-181717?logo=github)](https://github.com/TallMessiWu/personal-website)
 
-### Backend Project
-- [![Gitee](https://img.shields.io/badge/Gitee-tallmessiwu%2Fpersonal--website--backend-C71D23?logo=gitee)](https://gitee.com/tallmessiwu/personal-website-backend)
-- [![GitHub](https://img.shields.io/badge/GitHub-TallMessiWu%2Fpersonal--website--backend-181717?logo=github)](https://github.com/TallMessiWu/personal-website-backend)
+### Admin Project
+- [![Gitee](https://img.shields.io/badge/Gitee-tallmessiwu%2Fpersonal--website--admin-C71D23?logo=gitee)](https://gitee.com/tallmessiwu/personal-website-admin)
+- [![GitHub](https://img.shields.io/badge/GitHub-TallMessiWu%2Fpersonal--website--admin-181717?logo=github)](https://github.com/TallMessiWu/personal-website-admin)
 
 ## 🛠️ Tech Stack
 - **Core Framework**: [Vue 3](https://vuejs.org/) (Composition API / `<script setup>`)
