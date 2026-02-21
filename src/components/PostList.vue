@@ -6,11 +6,7 @@
     </div>
     <el-table :data="posts" border stripe>
       <el-table-column prop="id" label="ID" width="80" align="center" />
-      <el-table-column label="时间" width="160">
-        <template #default="{ row }">
-          {{ formatDate(row.date) }}
-        </template>
-      </el-table-column>
+      <el-table-column prop="date" label="时间" width="160" />
       <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">
           <el-tag v-if="row.pinned" type="danger" size="small" style="margin-right: 5px;">置顶</el-tag>
@@ -42,12 +38,6 @@
 import type { Post } from '../types';
 import { api } from '../api';
 import { ElMessage } from 'element-plus';
-
-const formatDate = (date: any) => {
-  if (!date) return '-';
-  const d = new Date(date);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-};
 
 const props = defineProps<{ posts: Post[] }>();
 const emit = defineEmits(['create', 'edit', 'refresh']);

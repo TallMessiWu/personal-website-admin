@@ -9,7 +9,7 @@ export interface Post {
   id: number;
   title: string;
   content?: string;
-  date: Date | string;
+  date: string;
   pinned?: boolean;
   images?: ImageItem[];
   video?: string;

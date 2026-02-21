@@ -14,6 +14,7 @@
         v-model="form.date"
         type="datetime"
         format="YYYY-MM-DD HH:mm"
+        value-format="YYYY-MM-DD HH:mm"
         placeholder="选择发布日期时间"
         style="width: 100%"
       />
@@ -89,7 +90,7 @@ const form = reactive<Post>({
   id: Date.now(),
   title: '',
   content: '',
-  date: new Date(),
+  date: '',
   pinned: false,
   video: '',
   images: [],
@@ -105,9 +106,10 @@ onMounted(() => {
   if (props.initialData) {
     Object.assign(form, JSON.parse(JSON.stringify(props.initialData)));
     if (!form.images) form.images = [];
-    if (typeof form.date === 'string') form.date = new Date(form.date);
   } else {
-    form.date = new Date();
+    // 默认当前时间 yyyy-MM-dd HH:mm
+    const d = new Date();
+    form.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 });
 
