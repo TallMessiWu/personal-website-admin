@@ -70,7 +70,9 @@ export function setupRoutes(app: Express) {
       }
 
       const file = req.file;
-      const cloudDir = req.body.type === 'video' ? 'posts/videos' : 'posts/images';
+      let cloudDir = 'posts/images';
+      if (req.body.type === 'video') cloudDir = 'posts/videos';
+      else if (req.body.type === 'thumbnail') cloudDir = 'posts/thumbnails';
       const ext = file.originalname.split('.').pop();
       const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const cloudPath = `${cloudDir}/${filename}`;
@@ -82,20 +84,6 @@ export function setupRoutes(app: Express) {
       });
 
       res.json({ success: true, fileID: uploadResult.fileID });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // 触发云端图片压缩 (调用云函数)
-  app.post('/compress', async (req: Request, res: Response) => {
-    try {
-      const { fileID } = req.body;
-      const result = await cloudbase.callFunction({
-        name: 'compressImage',
-        data: { fileID }
-      });
-      res.json({ success: true, result: result.result });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

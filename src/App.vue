@@ -46,12 +46,6 @@ onMounted(() => {
 
 const handleCreate = () => {
   editingPost.value = null; // null means create new
-  // generate an auto-increment or nice ID locally
-  const tempPost = {
-    id: posts.value.length ? Math.max(...posts.value.map(p => p.id)) + 1 : 1,
-    title: '', date: ''
-  } as Post;
-  editingPost.value = tempPost;
   view.value = 'form';
 };
 

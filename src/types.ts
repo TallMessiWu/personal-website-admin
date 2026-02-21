@@ -6,7 +6,7 @@ export interface ImageItem {
 
 export interface Post {
   _id?: string;
-  id: number;
+  id?: number;
   title: string;
   content?: string;
   date: string;

@@ -1,9 +1,5 @@
 <template>
   <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="post-form">
-    <el-form-item label="ID" prop="id">
-      <el-input-number v-model="form.id" :min="1" />
-      <span class="hint">唯一标识符，建议递增</span>
-    </el-form-item>
 
     <el-form-item label="标题" prop="title">
       <el-input v-model="form.title" placeholder="动态标题" />
@@ -87,7 +83,6 @@ const formRef = ref<FormInstance>();
 const submitting = ref(false);
 
 const form = reactive<Post>({
-  id: Date.now(),
   title: '',
   content: '',
   date: '',
@@ -97,7 +92,6 @@ const form = reactive<Post>({
 });
 
 const rules = reactive<FormRules>({
-  id: [{ required: true, message: 'ID不能为空', trigger: 'blur' }],
   title: [{ required: true, message: '标题不能为空', trigger: 'blur' }],
   date: [{ required: true, message: '日期不能为空', trigger: 'change' }],
 });
@@ -135,6 +129,45 @@ const triggerUpload = (index: number, field: 'image' | 'video', fileType: 'image
   }
 };
 
+const compressImageLocal = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.6): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas context not available'));
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error('Canvas toBlob failed'));
+          const newFile = new File([blob], `thumb_${file.name}`, {
+            type: file.type || 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(newFile);
+        }, file.type || 'image/jpeg', quality);
+      };
+      img.onerror = (e) => reject(e);
+    };
+    reader.onerror = (e) => reject(e);
+  });
+};
+
 const handleFileSelected = async (e: Event) => {
   const target = e.target as HTMLInputElement;
   if (!target.files?.length || !currentUploadTarget) return;
@@ -154,15 +187,18 @@ const handleFileSelected = async (e: Event) => {
     // 如果是图片，并且传到 image 字段，则顺便触发压缩
     if (fileType === 'image' && field === 'image') {
       item.image = fileID;
-      ElMessage.success('原图上传成功，正在生成缩略图...');
-      try {
-        const compressRes = await api.compressImage(fileID);
-        if (compressRes.thumbnailFileID) {
-          item.thumbnail = compressRes.thumbnailFileID;
-          ElMessage.success('缩略图生成成功！');
+      ElMessage.success('原图上传成功');
+
+      if (!item.thumbnail) {
+        ElMessage.info('正在本地生成缩略图...');
+        try {
+          const compressedFile = await compressImageLocal(file);
+          const thumbFileID = await api.uploadFile(compressedFile, 'thumbnail');
+          item.thumbnail = thumbFileID;
+          ElMessage.success('缩略图生成并上传成功！');
+        } catch (err: any) {
+          ElMessage.warning('原图已上传，但系统无法本地生成缩略图: ' + err.message);
         }
-      } catch (err: any) {
-        ElMessage.warning('原图已上传，但缩略图生成失败: ' + err.message);
       }
     } else if (field === 'video') {
       item.video = fileID;

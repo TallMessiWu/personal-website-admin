@@ -5,7 +5,7 @@
       <el-button type="primary" @click="$emit('create')">发新动态</el-button>
     </div>
     <el-table :data="posts" border stripe>
-      <el-table-column prop="id" label="ID" width="80" align="center" />
+      <el-table-column prop="_id" label="ID (_id)" width="220" align="center" show-overflow-tooltip />
       <el-table-column prop="date" label="时间" width="160" />
       <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">

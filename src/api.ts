@@ -39,8 +39,8 @@ export const api = {
     throw new Error(data.error);
   },
 
-  // fileType: 'image' | 'video'
-  async uploadFile(file: File, type: 'image' | 'video'): Promise<string> {
+  // fileType: 'image' | 'video' | 'thumbnail'
+  async uploadFile(file: File, type: 'image' | 'video' | 'thumbnail'): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);
@@ -51,17 +51,6 @@ export const api = {
     });
     const data = await res.json();
     if (data.success) return data.fileID;
-    throw new Error(data.error);
-  },
-
-  async compressImage(fileID: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/compress`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileID }),
-    });
-    const data = await res.json();
-    if (data.success) return data.result;
     throw new Error(data.error);
   }
 };
