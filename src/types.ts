@@ -2,6 +2,8 @@ export interface ImageItem {
   image: string;
   thumbnail?: string;
   video?: string;
+  _rawImageFile?: File;
+  _rawVideoFile?: File;
 }
 
 export interface Post {

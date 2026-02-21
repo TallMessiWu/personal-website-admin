@@ -37,8 +37,8 @@
       </div>
       <el-form-item label="原图 (高清)">
         <el-input v-model="item.image" placeholder="原图链接或 fileID" />
-        <el-button style="margin-top:5px" :loading="uploadingIndex === `${index}-image`" @click="triggerUpload(index, 'image', 'image')">
-          上传本地图片并压缩
+        <el-button style="margin-top:5px" @click="triggerUpload(index, 'image', 'image')">
+          选择本地图片
         </el-button>
       </el-form-item>
 
@@ -48,8 +48,8 @@
 
       <el-form-item label="Live视频">
         <el-input v-model="item.video" placeholder="Live Photo 短视频链接或 fileID" />
-        <el-button style="margin-top:5px" :loading="uploadingIndex === `${index}-video`" @click="triggerUpload(index, 'video', 'video')">
-          上传本地视频
+        <el-button style="margin-top:5px" @click="triggerUpload(index, 'video', 'video')">
+          选择本地视频
         </el-button>
       </el-form-item>
     </div>
@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, markRaw } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -174,43 +174,29 @@ const handleFileSelected = async (e: Event) => {
 
   const file = target.files[0] as File;
   const { index, field, fileType } = currentUploadTarget;
-  uploadingIndex.value = `${index}-${field}`;
 
-  try {
-    // 1. 直传到云存储
-    const fileID = await api.uploadFile(file, fileType);
-    if (!form.images) form.images = [];
-    const imgs = form.images as ImageItem[];
-    const item = imgs[index];
-    if (!item) return;
-
-    // 如果是图片，并且传到 image 字段，则顺便触发压缩
-    if (fileType === 'image' && field === 'image') {
-      item.image = fileID;
-      ElMessage.success('原图上传成功');
-
-      if (!item.thumbnail) {
-        ElMessage.info('正在本地生成缩略图...');
-        try {
-          const compressedFile = await compressImageLocal(file);
-          const thumbFileID = await api.uploadFile(compressedFile, 'thumbnail');
-          item.thumbnail = thumbFileID;
-          ElMessage.success('缩略图生成并上传成功！');
-        } catch (err: any) {
-          ElMessage.warning('原图已上传，但系统无法本地生成缩略图: ' + err.message);
-        }
-      }
-    } else if (field === 'video') {
-      item.video = fileID;
-      ElMessage.success('视频上传成功！');
-    }
-  } catch (err: any) {
-    ElMessage.error('上传失败: ' + err.message);
-  } finally {
-    uploadingIndex.value = '';
-    target.value = ''; // clear input
+  if (!form.images) form.images = [];
+  const imgs = form.images as ImageItem[];
+  const item = imgs[index];
+  if (!item) {
+    target.value = '';
     currentUploadTarget = null;
+    return;
   }
+
+  if (fileType === 'image' && field === 'image') {
+    item._rawImageFile = markRaw(file);
+    item.image = `[待上传] ${file.name}`;
+    ElMessage.success('已选择原图，提交时将自动上传并压缩');
+  } else if (field === 'video') {
+    item._rawVideoFile = markRaw(file);
+    item.video = `[待上传] ${file.name}`;
+    ElMessage.success('已选择视频，提交时将自动上传');
+  }
+
+  uploadingIndex.value = '';
+  target.value = ''; // clear input
+  currentUploadTarget = null;
 };
 
 const submitForm = async () => {
@@ -219,6 +205,44 @@ const submitForm = async () => {
     if (valid) {
       submitting.value = true;
       try {
+        // 先处理所有待上传的文件
+        if (form.images && form.images.length > 0) {
+          for (let i = 0; i < form.images.length; i++) {
+            const item = form.images[i];
+            if (!item) continue;
+
+            // 处理原图及缩略图
+            if (item._rawImageFile) {
+              const file = item._rawImageFile;
+              ElMessage.info(`正在上传第 ${i + 1} 项的原图...`);
+              const fileID = await api.uploadFile(file, 'image');
+              item.image = fileID;
+
+              if (!item.thumbnail || item.thumbnail.startsWith('[待上传]')) {
+                ElMessage.info(`正在本地生成并上传第 ${i + 1} 项的缩略图...`);
+                try {
+                  const compressedFile = await compressImageLocal(file);
+                  const thumbFileID = await api.uploadFile(compressedFile, 'thumbnail');
+                  item.thumbnail = thumbFileID;
+                } catch (err: any) {
+                  ElMessage.warning(`第 ${i + 1} 项的缩略图生成失败: ` + err.message);
+                  item.thumbnail = ''; // 失败则置空
+                }
+              }
+              delete item._rawImageFile;
+            }
+
+            // 处理视频
+            if (item._rawVideoFile) {
+              const file = item._rawVideoFile;
+              ElMessage.info(`正在上传第 ${i + 1} 项的视频...`);
+              const fileID = await api.uploadFile(file, 'video');
+              item.video = fileID;
+              delete item._rawVideoFile;
+            }
+          }
+        }
+
         const payload = { ...form };
         if (payload._id) {
           // Edit
