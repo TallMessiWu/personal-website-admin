@@ -39,6 +39,13 @@ export const api = {
     throw new Error(data.error);
   },
 
+  async getBilibiliInfo(bvid: string): Promise<{ title: string; desc: string; pic: string; pubdate: number }> {
+    const res = await fetch(`${API_BASE}/bilibili?bvid=${encodeURIComponent(bvid)}`);
+    const data = await res.json();
+    if (data.success) return data.data;
+    throw new Error(data.error);
+  },
+
   // fileType: 'image' | 'video' | 'thumbnail'
   async uploadFile(file: File, type: 'image' | 'video' | 'thumbnail'): Promise<string> {
     const formData = new FormData();

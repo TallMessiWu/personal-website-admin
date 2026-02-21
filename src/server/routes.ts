@@ -62,6 +62,39 @@ export function setupRoutes(app: Express) {
     }
   });
 
+  // 解析B站视频信息
+  app.get('/bilibili', async (req: Request, res: Response): Promise<any> => {
+    try {
+      const bvid = String(req.query.bvid || '');
+      if (!bvid) {
+        return res.status(400).json({ success: false, error: 'Missing bvid parameter' });
+      }
+
+      const response = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      const data = await response.json();
+
+      if (data.code === 0) {
+        res.json({
+          success: true,
+          data: {
+            title: data.data.title,
+            desc: data.data.desc,
+            pic: data.data.pic,
+            pubdate: data.data.pubdate
+          }
+        });
+      } else {
+        res.status(400).json({ success: false, error: data.message });
+      }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // 上传文件至云存储 (返回 fileID)
   app.post('/upload', upload.single('file'), async (req: Request, res: Response): Promise<any> => {
     try {

@@ -25,7 +25,7 @@
     </el-form-item>
 
     <el-form-item label="外部视频" prop="video">
-      <el-input v-model="form.video" placeholder="如 B站 BV 号或完整链接" />
+      <el-input v-model="form.video" placeholder="如 B站 BV 号或完整链接" @blur="handleVideoInput" />
     </el-form-item>
 
     <el-divider>图文混排 / Live Photo 配置</el-divider>
@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, markRaw } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import type { Post, ImageItem } from '../types';
 import { api } from '../api';
@@ -101,11 +101,65 @@ onMounted(() => {
     Object.assign(form, JSON.parse(JSON.stringify(props.initialData)));
     if (!form.images) form.images = [];
   } else {
-    // 默认当前时间 yyyy-MM-dd HH:mm
-    const d = new Date();
-    form.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    // 新建态保持 date 为空，如果想有默认值，也可以在这里填充
+    form.date = '';
   }
 });
+
+const handleVideoInput = async () => {
+  const videoVal = form.video || '';
+  if (!videoVal) return;
+
+  const match = videoVal.match(/(BV[1-9A-HJ-NP-Za-km-z]{10})/i);
+  if (!match || !match[1]) return;
+  const bvid = match[1];
+
+  try {
+    const info = await api.getBilibiliInfo(bvid);
+
+    // 将 B 站时间戳转为 YYYY-MM-DD HH:mm
+    const pubdateObj = new Date(info.pubdate * 1000);
+    const pubdateStr = `${pubdateObj.getFullYear()}-${String(pubdateObj.getMonth() + 1).padStart(2, '0')}-${String(pubdateObj.getDate()).padStart(2, '0')} ${String(pubdateObj.getHours()).padStart(2, '0')}:${String(pubdateObj.getMinutes()).padStart(2, '0')}`;
+
+    const hasConflict =
+      (form.title && form.title !== info.title) ||
+      (form.content && form.content !== info.desc) ||
+      (form.date && form.date !== pubdateStr) ||
+      (form.images && form.images.length > 0 && form.images[0]?.image && form.images[0]?.image !== info.pic);
+
+    const applyInfo = () => {
+      form.title = info.title;
+      form.content = info.desc;
+      form.date = pubdateStr;
+      if (!form.images) form.images = [];
+      if (form.images.length === 0) {
+        form.images.push({ image: info.pic, thumbnail: '', video: '' });
+      } else if (form.images[0]) {
+        form.images[0].image = info.pic;
+      }
+    };
+
+    if (hasConflict) {
+      ElMessageBox.confirm(
+        '检测到B站视频信息（标题、简介、封面），是否覆盖现有内容？',
+        '自动填充提示',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '取消',
+          type: 'info',
+        }
+      ).then(() => {
+        applyInfo();
+        ElMessage.success('已覆盖 B站 视频信息');
+      }).catch(() => {});
+    } else {
+      applyInfo();
+      ElMessage.success('已自动填充 B站 视频信息');
+    }
+  } catch (err: any) {
+    ElMessage.warning('获取 B站 视频信息失败，跳过自动填充');
+  }
+};
 
 const addImageItem = () => {
   if (!form.images) form.images = [];
