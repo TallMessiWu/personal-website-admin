@@ -1,0 +1,10 @@
+{
+    "name": "compress-image",
+    "version": "1.0.0",
+    "description": "Compress image and upload to cloud storage",
+    "main": "index.js",
+    "dependencies": {
+        "@cloudbase/node-sdk": "latest",
+        "sharp": "^0.33.2"
+    }
+}

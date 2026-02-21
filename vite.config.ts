@@ -1,7 +1,15 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { createApiApp } from './src/server/index'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    {
+      name: 'express-plugin',
+      configureServer(server) {
+        server.middlewares.use('/api', createApiApp())
+      }
+    }
+  ],
 })
