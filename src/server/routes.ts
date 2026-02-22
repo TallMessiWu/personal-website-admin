@@ -146,45 +146,63 @@ export function setupRoutes(app: Express) {
         item._hasOwnThumbnail = !!item.thumbnail;
       }
 
-      // 1. 如果 collection 没有 thumbnail 但有关联的 posts，收集这些 post ID
-      const needFallbackPostIds = new Set<string>();
+      // 1. 收集所有关联的 post ID（用于封面回退和最新日期计算）
+      const allPostIds = new Set<string>();
       for (const item of data as any[]) {
-        if (!item.thumbnail && item.posts && Array.isArray(item.posts)) {
-          item.posts.forEach((pid: string) => needFallbackPostIds.add(pid));
+        if (item.posts && Array.isArray(item.posts)) {
+          item.posts.forEach((pid: string) => allPostIds.add(pid));
         }
       }
 
-      // 拉取关联的 posts 数据进行封面回退
-      if (needFallbackPostIds.size > 0) {
+      // 拉取所有关联 posts 数据
+      let postMap = new Map<string, any>();
+      if (allPostIds.size > 0) {
         const _ = db.command;
-        // 分批或直接拉取对应 posts
         const postsRes = await db.collection('posts')
-          .where({ _id: _.in([...needFallbackPostIds]) })
+          .where({ _id: _.in([...allPostIds]) })
           .limit(1000)
           .get();
-
-        const postMap = new Map<string, any>();
         for (const p of postsRes.data || []) {
           postMap.set(p._id, p);
         }
+      }
 
-        // 为空封面的 collection 寻找回退图片
-        for (const item of data as any[]) {
-          if (!item.thumbnail && item.posts && Array.isArray(item.posts)) {
-            for (const pid of item.posts) {
-              const p = postMap.get(pid);
-              if (p?.images?.length) {
-                const first = p.images[0];
-                const cover = first.thumbnail || first.image;
-                if (cover) {
-                  item.thumbnail = cover;
-                  break; // 找到后即跳出当前 posts 遍历
-                }
+      for (const item of data as any[]) {
+        if (!item.posts || !Array.isArray(item.posts)) {
+          item._latestPostDate = '';
+          continue;
+        }
+
+        // 封面回退：如果没有自有封面，从关联 posts 中取第一张图
+        if (!item.thumbnail) {
+          for (const pid of item.posts) {
+            const p = postMap.get(pid);
+            if (p?.images?.length) {
+              const first = p.images[0];
+              const cover = first.thumbnail || first.image;
+              if (cover) {
+                item.thumbnail = cover;
+                break;
               }
             }
           }
         }
+
+        // 计算最新 post 日期
+        let latest = '';
+        for (const pid of item.posts) {
+          const p = postMap.get(pid);
+          if (p?.date && p.date > latest) latest = p.date;
+        }
+        item._latestPostDate = latest;
       }
+
+      // 按最新 post 日期降序排序
+      data.sort((a: any, b: any) => {
+        const da = a._latestPostDate || '';
+        const db2 = b._latestPostDate || '';
+        return db2 > da ? 1 : db2 < da ? -1 : 0;
+      });
 
       // 2. 解析 thumbnail fileID 为临时 URL
       const fileIDs = data

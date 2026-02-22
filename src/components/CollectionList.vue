@@ -31,6 +31,12 @@
           <el-tag size="small">{{ row.posts?.length || 0 }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="最新动态" width="170" align="center">
+        <template #default="{ row }">
+          <span v-if="row._latestPostDate">{{ row._latestPostDate }}</span>
+          <span v-else style="color: #999">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="180" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="$emit('edit', row)">编辑</el-button>
