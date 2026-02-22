@@ -2,7 +2,7 @@
   <div class="app-container">
     <el-container>
       <el-header height="60px" class="header">
-        <h1>个人网站后台管理 (纯本地版)</h1>
+        <h1>个人网站后台管理</h1>
       </el-header>
       <el-tabs v-model="activeTab" class="nav-tabs" @tab-change="onTabChange">
         <el-tab-pane label="动态管理" name="posts" />
@@ -134,7 +134,7 @@ body {
   background-color: #f5f7fa;
 }
 .app-container {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
   background-color: white;
   min-height: 100vh;
