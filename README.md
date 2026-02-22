@@ -23,25 +23,25 @@
 - **UI 组件库**: [Element Plus](https://element-plus.org/)
 - **后端服务**: [@cloudbase/node-sdk](https://docs.cloudbase.net/api-reference/server/node/sdk/introduce)
 
-+## 📂 项目结构
-+
-+```text
-+.
-+├── src/
-+│   ├── components/       # UI 组件 (List, Form 等)
-+│   ├── server/           # 后端逻辑 (Express 路由, CloudBase 交互)
-+│   ├── App.vue           # 根组件
-+│   ├── api.ts            # 前端 API 请求封装
-+│   ├── main.ts           # 应用入口
-+│   ├── types.ts          # TypeScript 类型定义
-+│   └── utils.ts          # 工具函数
-+├── public/               # 静态资源 (图片、图标等)
-+├── index.html            # 入口 HTML
-+├── package.json          # 依赖配置与脚本
-+├── tsconfig.json         # TypeScript 配置文件
-+└── vite.config.ts        # Vite 配置文件
-+```
-+
+## 📂 项目结构
+
+```text
+.
+├── src/
+│   ├── components/       # UI 组件 (List, Form 等)
+│   ├── server/           # 后端逻辑 (Express 路由, CloudBase 交互)
+│   ├── App.vue           # 根组件
+│   ├── api.ts            # 前端 API 请求封装
+│   ├── main.ts           # 应用入口
+│   ├── types.ts          # TypeScript 类型定义
+│   └── utils.ts          # 工具函数
+├── public/               # 静态资源 (图片、图标等)
+├── index.html            # 入口 HTML
+├── package.json          # 依赖配置与脚本
+├── tsconfig.json         # TypeScript 配置文件
+└── vite.config.ts        # Vite 配置文件
+```
+
 ## 📦 安装与运行
 
 1. **安装依赖**
