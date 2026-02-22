@@ -1,36 +1,34 @@
 <template>
-  <div class="post-list">
+  <div class="collection-list">
     <div class="header">
-      <h2>动态管理</h2>
-      <el-button type="primary" @click="$emit('create')">发新动态</el-button>
+      <h2>合集管理</h2>
+      <el-button type="primary" @click="$emit('create')">新建合集</el-button>
     </div>
-    <el-table :data="posts" border stripe>
-      <el-table-column prop="_id" label="ID (_id)" width="120" align="center" show-overflow-tooltip />
-      <el-table-column prop="date" label="时间" width="160" />
-      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip>
-        <template #default="{ row }">
-          <el-tag v-if="row.pinned" type="danger" size="small" style="margin-right: 5px;">置顶</el-tag>
-          {{ row.title }}
-        </template>
-      </el-table-column>
+    <el-table :data="collections" border stripe>
+      <el-table-column prop="_id" label="ID (_id)" width="220" align="center" show-overflow-tooltip />
+      <el-table-column prop="name" label="名称" min-width="200" show-overflow-tooltip />
       <el-table-column label="封面" width="100" align="center">
         <template #default="{ row }">
           <el-image
-            v-if="getCover(row)"
-            :src="getCover(row)"
+            v-if="row.thumbnail"
+            :src="row.thumbnail"
             style="width: 50px; height: 50px"
             fit="cover"
-            :preview-src-list="[getCover(row)!]"
+            :preview-src-list="[row.thumbnail]"
             preview-teleported
           />
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="多媒体" width="100" align="center">
+      <el-table-column label="封面状态" width="100" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.images?.length" size="small">{{ row.images.length }} 图</el-tag>
-          <el-tag v-else-if="row.video" type="warning" size="small">视频</el-tag>
-          <span v-else>-</span>
+          <el-tag v-if="row._hasOwnThumbnail" type="success" size="small">已设置</el-tag>
+          <el-tag v-else type="info" size="small">未设置</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="Posts 数" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag size="small">{{ row.posts?.length || 0 }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" align="center">
@@ -48,23 +46,17 @@
 </template>
 
 <script setup lang="ts">
-import type { Post } from '../types';
+import type { Collection } from '../types';
 import { api } from '../api';
 import { ElMessage } from 'element-plus';
 
-const props = defineProps<{ posts: Post[] }>();
+const props = defineProps<{ collections: Collection[] }>();
 const emit = defineEmits(['create', 'edit', 'refresh']);
-
-function getCover(row: Post): string | null {
-  const first = row.images?.[0];
-  if (!first) return null;
-  return first.thumbnail || first.image || null;
-}
 
 async function handleDelete(id?: string) {
   if (!id) return;
   try {
-    await api.deletePost(id);
+    await api.deleteCollection(id);
     ElMessage.success('删除成功');
     emit('refresh');
   } catch (e: any) {

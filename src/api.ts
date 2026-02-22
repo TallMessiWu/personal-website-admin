@@ -1,4 +1,4 @@
-import type { Post } from './types';
+import type { Post, Collection } from './types';
 
 const API_BASE = '/api';
 
@@ -46,8 +46,8 @@ export const api = {
     throw new Error(data.error);
   },
 
-  // fileType: 'image' | 'video' | 'thumbnail'
-  async uploadFile(file: File, type: 'image' | 'video' | 'thumbnail'): Promise<string> {
+  // fileType: 'image' | 'video' | 'thumbnail' | 'collection'
+  async uploadFile(file: File, type: 'image' | 'video' | 'thumbnail' | 'collection'): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);
@@ -59,5 +59,43 @@ export const api = {
     const data = await res.json();
     if (data.success) return data.fileID;
     throw new Error(data.error);
-  }
+  },
+
+  // ==================== Collections ====================
+
+  async getCollections(): Promise<Collection[]> {
+    const res = await fetch(`${API_BASE}/collections`);
+    const data = await res.json();
+    if (data.success) return data.data;
+    throw new Error(data.error);
+  },
+
+  async createCollection(collection: Omit<Collection, '_id'>): Promise<string> {
+    const res = await fetch(`${API_BASE}/collections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collection),
+    });
+    const data = await res.json();
+    if (data.success) return data.id;
+    throw new Error(data.error);
+  },
+
+  async updateCollection(id: string, collection: Partial<Collection>): Promise<any> {
+    const res = await fetch(`${API_BASE}/collections/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collection),
+    });
+    const data = await res.json();
+    if (data.success) return data.result;
+    throw new Error(data.error);
+  },
+
+  async deleteCollection(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/collections/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) return data.result;
+    throw new Error(data.error);
+  },
 };

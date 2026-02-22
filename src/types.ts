@@ -16,3 +16,11 @@ export interface Post {
   images?: ImageItem[];
   video?: string;
 }
+
+export interface Collection {
+  _id?: string;
+  name: string;
+  thumbnail: string;
+  posts: string[];
+  _rawThumbnailFile?: File;
+}
