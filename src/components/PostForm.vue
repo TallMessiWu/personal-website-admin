@@ -33,7 +33,11 @@
     <div v-for="(item, index) in form.images" :key="index" class="image-item-card">
       <div class="card-header">
         <span>图片项 {{ index + 1 }}</span>
-        <el-button type="danger" size="small" icon="Delete" circle @click="removeImage(index)" />
+        <div class="card-actions">
+          <el-button :icon="ArrowUp" size="small" circle :disabled="index === 0" @click="moveImageUp(index)" />
+          <el-button :icon="ArrowDown" size="small" circle :disabled="index === (form.images?.length ?? 1) - 1" @click="moveImageDown(index)" />
+          <el-button type="danger" size="small" icon="Delete" circle @click="removeImage(index)" />
+        </div>
       </div>
       <el-form-item label="原图 (高清)">
         <el-input v-model="item.image" placeholder="原图链接或 fileID" />
@@ -72,7 +76,7 @@
 import { ref, reactive, onMounted, markRaw } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
+import { Plus, ArrowUp, ArrowDown } from '@element-plus/icons-vue';
 import type { Post, ImageItem } from '../types';
 import { api } from '../api';
 import { compressImageLocal } from '../utils';
@@ -165,6 +169,18 @@ const handleVideoInput = async () => {
 const addImageItem = () => {
   if (!form.images) form.images = [];
   form.images.push({ image: '', thumbnail: '', video: '' });
+};
+
+const moveImageUp = (index: number) => {
+  if (!form.images || index <= 0) return;
+  const temp = form.images.splice(index, 1)[0];
+  if (temp) form.images.splice(index - 1, 0, temp);
+};
+
+const moveImageDown = (index: number) => {
+  if (!form.images || index >= form.images.length - 1) return;
+  const temp = form.images.splice(index, 1)[0];
+  if (temp) form.images.splice(index + 1, 0, temp);
 };
 
 const removeImage = (index: number) => {
@@ -302,5 +318,9 @@ const submitForm = async () => {
   margin-bottom: 15px;
   font-weight: bold;
   color: #606266;
+}
+.card-actions {
+  display: flex;
+  gap: 4px;
 }
 </style>

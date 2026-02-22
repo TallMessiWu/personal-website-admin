@@ -60,26 +60,62 @@ export function setupRoutes(app: Express) {
     }
   });
 
-  // 更新
+  // 辅助：从 images 数组中提取所有 cloud:// fileID
+  const collectFileIDs = (images: any[]): string[] => {
+    const ids: string[] = [];
+    if (!Array.isArray(images)) return ids;
+    for (const img of images) {
+      if (img.image && img.image.startsWith('cloud://')) ids.push(img.image);
+      if (img.thumbnail && img.thumbnail.startsWith('cloud://')) ids.push(img.thumbnail);
+      if (img.video && img.video.startsWith('cloud://')) ids.push(img.video);
+    }
+    return ids;
+  };
+
+  // 更新（清理不再引用的图片）
   app.put('/posts/:id', async (req: Request, res: Response) => {
     try {
       const id = String(req.params.id);
       const data = req.body;
-      // 移除 _id 防止更新报错
       delete data._id;
 
+      // 获取旧文档
+      const oldDoc = await db.collection('posts').doc(id).get();
+      const oldImages = oldDoc.data?.[0]?.images || [];
+
       const result = await db.collection('posts').doc(id).update(data);
+
+      // 对比新旧 fileID，删除不再被引用的
+      const oldIDs = new Set(collectFileIDs(oldImages));
+      const newIDs = new Set(collectFileIDs(data.images || []));
+      const toDelete = [...oldIDs].filter(fid => !newIDs.has(fid));
+      if (toDelete.length > 0) {
+        cloudbase.deleteFile({ fileList: toDelete }).catch(() => {});
+      }
+
       res.json({ success: true, result });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // 删除
+  // 删除（清理所有关联图片）
   app.delete('/posts/:id', async (req: Request, res: Response) => {
     try {
       const id = String(req.params.id);
+
+      // 先获取文档，用于清理文件
+      const oldDoc = await db.collection('posts').doc(id).get();
+      const oldImages = oldDoc.data?.[0]?.images || [];
+
       const result = await db.collection('posts').doc(id).remove();
+
+      // 清理云存储中的所有关联文件
+      const toDelete = collectFileIDs(oldImages);
+      if (toDelete.length > 0) {
+        cloudbase.deleteFile({ fileList: toDelete }).catch(() => {});
+      }
+
       res.json({ success: true, result });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
