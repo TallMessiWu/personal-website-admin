@@ -44,7 +44,16 @@
         <el-button style="margin-top:5px" @click="triggerUpload(index, 'image', 'image')">
           选择本地图片
         </el-button>
-        <div v-if="item._imageUrl && !item.image?.startsWith('[待上传]')" style="margin-top: 8px;">
+        <div v-if="getPreviewUrl(item) && !item.image?.startsWith('http') && !item.image?.startsWith('cloud://')" style="margin-top: 8px;">
+          <el-image
+            :src="getPreviewUrl(item)"
+            style="width: 120px; height: 120px"
+            fit="cover"
+            :preview-src-list="[getPreviewUrl(item)]"
+            preview-teleported
+          />
+        </div>
+        <div v-else-if="item._imageUrl" style="margin-top: 8px;">
           <el-image
             :src="item._imageUrl"
             style="width: 120px; height: 120px"
@@ -242,6 +251,17 @@ const handleFileSelected = async (e: Event) => {
   currentUploadTarget = null;
 };
 
+const getPreviewUrl = (item: ImageItem) => {
+  if (item._rawImageFile) {
+    return URL.createObjectURL(item._rawImageFile);
+  }
+  // 如果 item.image 是 [待上传] 状态，但没有 _rawImageFile，可能还在处理中或出错
+  if (item.image?.startsWith('[待上传]')) {
+    return '';
+  }
+  return item._imageUrl || item.image;
+};
+
 const submitForm = async () => {
   if (!formRef.value) return;
   await formRef.value.validate(async (valid) => {
@@ -262,14 +282,19 @@ const submitForm = async () => {
               item.image = fileID;
 
               if (!item.thumbnail || item.thumbnail.startsWith('[待上传]')) {
-                ElMessage.info(`正在本地生成并上传第 ${i + 1} 项的缩略图...`);
-                try {
-                  const compressedFile = await compressImageLocal(file);
-                  const thumbFileID = await api.uploadFile(compressedFile, 'thumbnail');
-                  item.thumbnail = thumbFileID;
-                } catch (err: any) {
-                  ElMessage.warning(`第 ${i + 1} 项的缩略图生成失败: ` + err.message);
-                  item.thumbnail = ''; // 失败则置空
+                // 如果原图小于 1MB，直接用原图 fileID 当缩略图
+                if (file.size < 1024 * 1024) {
+                  item.thumbnail = fileID;
+                } else {
+                  ElMessage.info(`正在本地生成并上传第 ${i + 1} 项的缩略图...`);
+                  try {
+                    const compressedFile = await compressImageLocal(file);
+                    const thumbFileID = await api.uploadFile(compressedFile, 'thumbnail');
+                    item.thumbnail = thumbFileID;
+                  } catch (err: any) {
+                    ElMessage.warning(`第 ${i + 1} 项的缩略图生成失败: ` + err.message);
+                    item.thumbnail = ''; // 失败则置空
+                  }
                 }
               }
               delete item._rawImageFile;

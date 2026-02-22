@@ -273,10 +273,18 @@ const submitForm = async () => {
       try {
         // 处理 thumbnail 上传
         if (form._rawThumbnailFile) {
-          ElMessage.info('正在压缩并上传封面图...');
-          const compressed = await compressImageLocal(form._rawThumbnailFile, 600, 600, 0.7);
-          const fileID = await api.uploadFile(compressed, 'collection');
-          form.thumbnail = fileID;
+          const file = form._rawThumbnailFile;
+          // 如果原图小于 1MB，直接上传，不再压缩
+          if (file.size < 1024 * 1024) {
+            ElMessage.info('图片较小，正在直接上传封面图...');
+            const fileID = await api.uploadFile(file, 'collection');
+            form.thumbnail = fileID;
+          } else {
+            ElMessage.info('正在压缩并上传封面图...');
+            const compressed = await compressImageLocal(file, 600, 600, 0.7);
+            const fileID = await api.uploadFile(compressed, 'collection');
+            form.thumbnail = fileID;
+          }
           delete form._rawThumbnailFile;
         }
 
