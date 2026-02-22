@@ -6,6 +6,12 @@
     </div>
     <el-table :data="collections" border stripe>
       <el-table-column prop="_id" label="ID (_id)" width="220" align="center" show-overflow-tooltip />
+      <el-table-column label="最新动态时间" width="170" align="center">
+        <template #default="{ row }">
+          <span v-if="row.latestPostDate">{{ row.latestPostDate }}</span>
+          <span v-else style="color: #999">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="名称" min-width="200" show-overflow-tooltip />
       <el-table-column label="封面" width="100" align="center">
         <template #default="{ row }">
@@ -29,12 +35,6 @@
       <el-table-column label="Posts 数" width="100" align="center">
         <template #default="{ row }">
           <el-tag size="small">{{ row.posts?.length || 0 }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="最新动态" width="170" align="center">
-        <template #default="{ row }">
-          <span v-if="row.latestPostDate">{{ row.latestPostDate }}</span>
-          <span v-else style="color: #999">-</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" align="center">
