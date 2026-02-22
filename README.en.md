@@ -23,6 +23,25 @@ This project is a personal website admin dashboard and data management system bu
 - **UI Component Library**: [Element Plus](https://element-plus.org/)
 - **Backend Services**: [@cloudbase/node-sdk](https://docs.cloudbase.net/api-reference/server/node/sdk/introduce)
 
++## 📂 Project Structure
++
++```text
++.
++├── src/
++│   ├── components/       # UI Components (List, Form, etc.)
++│   ├── server/           # Backend Logic (Express routes, CloudBase interaction)
++│   ├── App.vue           # Root Component
++│   ├── api.ts            # Frontend API client encapsulation
++│   ├── main.ts           # Application entry point
++│   ├── types.ts          # TypeScript type definitions
++│   └── utils.ts          # Utility functions
++├── public/               # Static assets
++├── index.html            # Entry HTML
++├── package.json          # Dependencies and scripts
++├── tsconfig.json         # TypeScript configuration
++└── vite.config.ts        # Vite configuration
++```
++
 ## 📦 Installation & Setup
 
 1. **Install dependencies**
