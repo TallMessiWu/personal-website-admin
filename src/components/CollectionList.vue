@@ -12,7 +12,12 @@
           <span v-else style="color: #999">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="name" label="名称" min-width="200" show-overflow-tooltip />
+      <el-table-column label="名称" min-width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-tag v-if="row.pinned" type="danger" size="small" style="margin-right: 5px;">置顶</el-tag>
+          {{ row.name }}
+        </template>
+      </el-table-column>
       <el-table-column label="封面" width="100" align="center">
         <template #default="{ row }">
           <el-image

@@ -223,8 +223,10 @@ export function setupRoutes(app: Express) {
         item.latestPostDate = latest;
       }
 
-      // 按最新 post 日期降序排序
+      // 按置顶优先 + 最新 post 日期降序排序
       data.sort((a: any, b: any) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
         const da = a.latestPostDate || '';
         const db2 = b.latestPostDate || '';
         return db2 > da ? 1 : db2 < da ? -1 : 0;

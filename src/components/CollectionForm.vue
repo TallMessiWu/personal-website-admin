@@ -5,6 +5,10 @@
       <el-input v-model="form.name" placeholder="合集名称" />
     </el-form-item>
 
+    <el-form-item label="置顶">
+      <el-switch v-model="form.pinned" />
+    </el-form-item>
+
     <el-form-item label="最新动态">
       <el-tag v-if="form.latestPostDate" type="info">{{ form.latestPostDate }}</el-tag>
       <span v-else style="color: #999">（空，添加 Post 后自动计算）</span>
@@ -131,6 +135,7 @@ const form = reactive<Collection & { _rawThumbnailFile?: File }>({
   name: '',
   thumbnail: '',
   posts: [],
+  pinned: false,
   latestPostDate: '',
 });
 
@@ -279,6 +284,7 @@ const submitForm = async () => {
           name: form.name,
           thumbnail: form.thumbnail,
           posts: form.posts,
+          pinned: !!form.pinned,
           latestPostDate: form.latestPostDate,
         };
 

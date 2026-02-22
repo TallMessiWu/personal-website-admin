@@ -25,6 +25,7 @@ export interface Collection {
   name: string;
   thumbnail: string;
   posts: string[];
+  pinned?: boolean;
   _rawThumbnailFile?: File;
   /** 展示用临时 URL（后端解析 fileID 或回退自 posts 后填充，不存入数据库） */
   _displayThumbnail?: string;
