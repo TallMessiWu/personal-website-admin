@@ -10,11 +10,11 @@
       <el-table-column label="封面" width="100" align="center">
         <template #default="{ row }">
           <el-image
-            v-if="row.thumbnail"
-            :src="row.thumbnail"
+            v-if="row._displayThumbnail"
+            :src="row._displayThumbnail"
             style="width: 50px; height: 50px"
             fit="cover"
-            :preview-src-list="[row.thumbnail]"
+            :preview-src-list="[row._displayThumbnail]"
             preview-teleported
           />
           <span v-else>-</span>
@@ -33,7 +33,7 @@
       </el-table-column>
       <el-table-column label="最新动态" width="170" align="center">
         <template #default="{ row }">
-          <span v-if="row._latestPostDate">{{ row._latestPostDate }}</span>
+          <span v-if="row.latestPostDate">{{ row.latestPostDate }}</span>
           <span v-else style="color: #999">-</span>
         </template>
       </el-table-column>

@@ -167,58 +167,68 @@ export function setupRoutes(app: Express) {
         }
       }
 
+      // 2. 解析所有相关 fileID (包括合集原始封面和所有可能的 fallback 来源)
+      const fileIDSet = new Set<string>();
       for (const item of data as any[]) {
-        if (!item.posts || !Array.isArray(item.posts)) {
-          item._latestPostDate = '';
-          continue;
+        if (item.thumbnail && item.thumbnail.startsWith('cloud://')) {
+          fileIDSet.add(item.thumbnail);
         }
+      }
+      for (const p of postMap.values()) {
+        const first = p.images?.[0];
+        const cover = first?.thumbnail || first?.image;
+        if (cover && cover.startsWith('cloud://')) {
+          fileIDSet.add(cover);
+        }
+      }
 
-        // 封面回退：如果没有自有封面，从关联 posts 中取第一张图
-        if (!item.thumbnail) {
+      let urlMap = new Map<string, string>();
+      if (fileIDSet.size > 0) {
+        const urlResult = await cloudbase.getTempFileURL({ fileList: [...fileIDSet] });
+        urlMap = new Map(
+          urlResult.fileList.map((f: any) => [f.fileID, f.tempFileURL])
+        );
+      }
+
+      for (const item of data as any[]) {
+        // 计算 _thumbnailUrl: 原始 thumbnail 的解析结果
+        item._thumbnailUrl = urlMap.get(item.thumbnail) || item.thumbnail || '';
+        // 初始展示字段设为原始封面 URL
+        item._displayThumbnail = item._thumbnailUrl;
+
+        // 封面回退：如果没有自有封面，从关联 posts 中取展示图
+        if (!item._displayThumbnail && item.posts && Array.isArray(item.posts)) {
           for (const pid of item.posts) {
             const p = postMap.get(pid);
             if (p?.images?.length) {
               const first = p.images[0];
               const cover = first.thumbnail || first.image;
               if (cover) {
-                item.thumbnail = cover;
+                // 回退也使用解析后的 URL
+                item._displayThumbnail = urlMap.get(cover) || cover;
                 break;
               }
             }
           }
         }
 
-        // 计算最新 post 日期
+        // 计算 latestPostDate: 最新 post 日期
         let latest = '';
-        for (const pid of item.posts) {
-          const p = postMap.get(pid);
-          if (p?.date && p.date > latest) latest = p.date;
+        if (item.posts && Array.isArray(item.posts)) {
+          for (const pid of item.posts) {
+            const p = postMap.get(pid);
+            if (p?.date && p.date > latest) latest = p.date;
+          }
         }
-        item._latestPostDate = latest;
+        item.latestPostDate = latest;
       }
 
       // 按最新 post 日期降序排序
       data.sort((a: any, b: any) => {
-        const da = a._latestPostDate || '';
-        const db2 = b._latestPostDate || '';
+        const da = a.latestPostDate || '';
+        const db2 = b.latestPostDate || '';
         return db2 > da ? 1 : db2 < da ? -1 : 0;
       });
-
-      // 2. 解析 thumbnail fileID 为临时 URL
-      const fileIDs = data
-        .map((item: any) => item.thumbnail)
-        .filter((t: string) => t && t.startsWith('cloud://'));
-      if (fileIDs.length > 0) {
-        const urlResult = await cloudbase.getTempFileURL({ fileList: fileIDs });
-        const urlMap = new Map(
-          urlResult.fileList.map((f: any) => [f.fileID, f.tempFileURL])
-        );
-        for (const item of data as any[]) {
-          if (item.thumbnail && urlMap.has(item.thumbnail)) {
-            item.thumbnail = urlMap.get(item.thumbnail);
-          }
-        }
-      }
 
       res.json({ success: true, data });
     } catch (err: any) {

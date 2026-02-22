@@ -5,11 +5,22 @@
       <el-input v-model="form.name" placeholder="合集名称" />
     </el-form-item>
 
+    <el-form-item label="最新动态">
+      <el-tag v-if="form.latestPostDate" type="info">{{ form.latestPostDate }}</el-tag>
+      <span v-else style="color: #999">（空，添加 Post 后自动计算）</span>
+    </el-form-item>
+
     <el-form-item label="封面图">
       <el-input v-model="form.thumbnail" placeholder="封面图链接或 fileID" style="margin-bottom: 8px" />
       <el-button @click="triggerThumbnailUpload">选择本地图片</el-button>
       <div v-if="thumbnailPreview" style="margin-top: 8px;">
-        <el-image :src="thumbnailPreview" style="width: 120px; height: 120px" fit="cover" />
+        <el-image
+          :src="thumbnailPreview"
+          style="width: 120px; height: 120px"
+          fit="cover"
+          :preview-src-list="[thumbnailPreview]"
+          preview-teleported
+        />
       </div>
     </el-form-item>
 
@@ -120,6 +131,7 @@ const form = reactive<Collection & { _rawThumbnailFile?: File }>({
   name: '',
   thumbnail: '',
   posts: [],
+  latestPostDate: '',
 });
 
 // 已选 posts 的完整对象列表（用于展示和排序）
@@ -134,8 +146,9 @@ const thumbnailPreview = computed(() => {
   if (form._rawThumbnailFile) {
     return URL.createObjectURL(form._rawThumbnailFile);
   }
+  // 优先展示后端解析出的 _thumbnailUrl，或者是合集自有的 URL/fileID
   if (form.thumbnail && !form.thumbnail.startsWith('[待上传]')) {
-    return form.thumbnail;
+    return (form as any)._thumbnailUrl || form.thumbnail;
   }
   return '';
 });
@@ -165,11 +178,20 @@ const rebuildSelectedPosts = () => {
   selectedPosts.value = form.posts
     .map((id) => postMap.get(id))
     .filter(Boolean) as Post[];
+  // 初始化计算最新日期
+  syncFormPosts();
 };
 
-// 同步 selectedPosts 回 form.posts
+// 同步 selectedPosts 回 form.posts 并更新最新动态日期
 const syncFormPosts = () => {
   form.posts = selectedPosts.value.map((p) => p._id!).filter(Boolean);
+
+  // 自动计算最新动态日期
+  let latest = '';
+  for (const p of selectedPosts.value) {
+    if (p.date && p.date > latest) latest = p.date;
+  }
+  form.latestPostDate = latest;
 };
 
 // ===== 排序操作 =====
@@ -216,6 +238,7 @@ const addSelectedPosts = () => {
       selectedPosts.value.push(post);
     }
   }
+  syncFormPosts();
   pendingSelection.value = [];
   // 清空勾选状态
   availableTableRef.value?.clearSelection();
@@ -256,6 +279,7 @@ const submitForm = async () => {
           name: form.name,
           thumbnail: form.thumbnail,
           posts: form.posts,
+          latestPostDate: form.latestPostDate,
         };
 
         if (form._id) {

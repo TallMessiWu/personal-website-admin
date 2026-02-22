@@ -26,4 +26,11 @@ export interface Collection {
   thumbnail: string;
   posts: string[];
   _rawThumbnailFile?: File;
+  /** 展示用临时 URL（后端解析 fileID 或回退自 posts 后填充，不存入数据库） */
+  _displayThumbnail?: string;
+  _thumbnailUrl?: string;
+  /** 合集内最新 post 的日期 (持久化字段) */
+  latestPostDate?: string;
+  /** 是否设置了自有封面 */
+  _hasOwnThumbnail?: boolean;
 }
