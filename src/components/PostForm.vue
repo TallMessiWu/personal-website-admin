@@ -44,6 +44,15 @@
         <el-button style="margin-top:5px" @click="triggerUpload(index, 'image', 'image')">
           选择本地图片
         </el-button>
+        <div v-if="item._imageUrl && !item.image?.startsWith('[待上传]')" style="margin-top: 8px;">
+          <el-image
+            :src="item._imageUrl"
+            style="width: 120px; height: 120px"
+            fit="cover"
+            :preview-src-list="[item._imageUrl]"
+            preview-teleported
+          />
+        </div>
       </el-form-item>
 
       <el-form-item label="缩略图 (低清)">

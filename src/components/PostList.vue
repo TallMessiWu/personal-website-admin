@@ -58,7 +58,7 @@ const emit = defineEmits(['create', 'edit', 'refresh']);
 function getCover(row: Post): string | null {
   const first = row.images?.[0];
   if (!first) return null;
-  return first.thumbnail || first.image || null;
+  return first._thumbnailUrl || first._imageUrl || first.thumbnail || first.image || null;
 }
 
 async function handleDelete(id?: string) {

@@ -4,6 +4,9 @@ export interface ImageItem {
   video?: string;
   _rawImageFile?: File;
   _rawVideoFile?: File;
+  /** 展示用临时 URL（后端解析 fileID 后填充，不存入数据库） */
+  _imageUrl?: string;
+  _thumbnailUrl?: string;
 }
 
 export interface Post {

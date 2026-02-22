@@ -18,7 +18,7 @@ export function setupRoutes(app: Express) {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
 
-      // 收集所有 images 中的 fileID 并批量解析
+      // 收集所有 images 中的 fileID 并批量解析为展示用 URL（保留原始 fileID 不变）
       const fileIDSet = new Set<string>();
       for (const post of data as any[]) {
         if (post.images && Array.isArray(post.images)) {
@@ -36,8 +36,19 @@ export function setupRoutes(app: Express) {
         for (const post of data as any[]) {
           if (post.images && Array.isArray(post.images)) {
             for (const img of post.images) {
-              if (img.thumbnail && urlMap.has(img.thumbnail)) img.thumbnail = urlMap.get(img.thumbnail);
-              if (img.image && urlMap.has(img.image)) img.image = urlMap.get(img.image);
+              // 写入展示专用字段，不覆盖原始 fileID
+              img._imageUrl = urlMap.get(img.image) || img.image || '';
+              img._thumbnailUrl = urlMap.get(img.thumbnail) || img.thumbnail || '';
+            }
+          }
+        }
+      } else {
+        // 没有 fileID 需要解析时，也把展示字段设为原值
+        for (const post of data as any[]) {
+          if (post.images && Array.isArray(post.images)) {
+            for (const img of post.images) {
+              img._imageUrl = img.image || '';
+              img._thumbnailUrl = img.thumbnail || '';
             }
           }
         }
