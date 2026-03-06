@@ -39,6 +39,9 @@
           <el-button type="danger" size="small" icon="Delete" circle @click="removeImage(index)" />
         </div>
       </div>
+      <el-form-item label="Live Photo">
+        <el-checkbox v-model="item.isLivePhoto">包含实况视频 (Live Photo)，提交时将自动提取</el-checkbox>
+      </el-form-item>
       <el-form-item label="原图 (高清)">
         <el-input v-model="item.image" placeholder="原图链接或 fileID" />
         <el-button style="margin-top:5px" @click="triggerUpload(index, 'image', 'image')">
@@ -68,7 +71,7 @@
         <el-input v-model="item.thumbnail" placeholder="缩略图链接或 fileID，上传原图时自动生成" />
       </el-form-item>
 
-      <el-form-item label="Live视频">
+      <el-form-item label="Live视频" v-if="!item.isLivePhoto">
         <el-input v-model="item.video" placeholder="Live Photo 短视频链接或 fileID" />
         <el-button style="margin-top:5px" @click="triggerUpload(index, 'video', 'video')">
           选择本地视频
@@ -156,7 +159,7 @@ const handleVideoInput = async () => {
       form.date = pubdateStr;
       if (!form.images) form.images = [];
       if (form.images.length === 0) {
-        form.images.push({ image: info.pic, thumbnail: '', video: '' });
+        form.images.push({ image: info.pic, thumbnail: '', video: '', isLivePhoto: false });
       } else if (form.images[0]) {
         form.images[0].image = info.pic;
       }
@@ -186,7 +189,7 @@ const handleVideoInput = async () => {
 
 const addImageItem = () => {
   if (!form.images) form.images = [];
-  form.images.push({ image: '', thumbnail: '', video: '' });
+  form.images.push({ image: '', thumbnail: '', video: '', isLivePhoto: false });
 };
 
 const moveImageUp = (index: number) => {
@@ -273,6 +276,42 @@ const submitForm = async () => {
           for (let i = 0; i < form.images.length; i++) {
             const item = form.images[i];
             if (!item) continue;
+
+            // 如果勾选了 Live Photo，尝试从原图中提取视频
+            if (item.isLivePhoto && item._rawImageFile) {
+              ElMessage.info(`正在尝试提取第 ${i + 1} 项的 Live Photo 视频...`);
+              const buffer = await item._rawImageFile.arrayBuffer();
+              const view = new Uint8Array(buffer);
+              const ftypPattern = [0x66, 0x74, 0x79, 0x70];
+              let signatureIdx = -1;
+
+              for (let j = 0; j < view.length - 3; j++) {
+                if (
+                  view[j] === ftypPattern[0] &&
+                  view[j + 1] === ftypPattern[1] &&
+                  view[j + 2] === ftypPattern[2] &&
+                  view[j + 3] === ftypPattern[3]
+                ) {
+                  signatureIdx = j;
+                  break;
+                }
+              }
+
+              if (signatureIdx === -1) {
+                throw new Error(`第 ${i + 1} 项未检测到隐藏视频，这可能只是一张普通的图片。`);
+              }
+
+              const videoStartIdx = signatureIdx - 4;
+              const imageBuffer = buffer.slice(0, videoStartIdx);
+              const videoBuffer = buffer.slice(videoStartIdx);
+
+              const imageBlob = new Blob([imageBuffer], { type: item._rawImageFile.type || 'image/jpeg' });
+              const videoBlob = new Blob([videoBuffer], { type: 'video/mp4' });
+
+              item._rawImageFile = new File([imageBlob], item._rawImageFile.name, { type: item._rawImageFile.type || 'image/jpeg' });
+              item._rawVideoFile = new File([videoBlob], item._rawImageFile.name.replace(/\.[^/.]+$/, "") + "_live.mp4", { type: 'video/mp4' });
+              item.video = `[待上传] ${item._rawVideoFile.name}`;
+            }
 
             // 处理原图及缩略图
             if (item._rawImageFile) {

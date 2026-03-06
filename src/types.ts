@@ -2,6 +2,7 @@ export interface ImageItem {
   image: string;
   thumbnail?: string;
   video?: string;
+  isLivePhoto?: boolean;
   _rawImageFile?: File;
   _rawVideoFile?: File;
   /** 展示用临时 URL（后端解析 fileID 后填充，不存入数据库） */
