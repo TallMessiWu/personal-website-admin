@@ -6,14 +6,17 @@
     </el-form-item>
 
     <el-form-item label="日期" prop="date">
-      <el-date-picker
-        v-model="form.date"
-        type="datetime"
-        format="YYYY-MM-DD HH:mm"
-        value-format="YYYY-MM-DD HH:mm"
-        placeholder="选择发布日期时间"
-        style="width: 100%"
-      />
+      <div style="display: flex; gap: 10px; width: 100%;">
+        <el-date-picker
+          v-model="form.date"
+          type="datetime"
+          format="YYYY-MM-DD HH:mm"
+          value-format="YYYY-MM-DD HH:mm"
+          placeholder="选择发布日期时间"
+          style="flex: 1;"
+        />
+        <el-button @click="fillCurrentTime">当前时间</el-button>
+      </div>
     </el-form-item>
 
     <el-form-item label="正文" prop="content">
@@ -131,6 +134,16 @@ onMounted(() => {
     form.date = '';
   }
 });
+
+const fillCurrentTime = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const date = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  form.date = `${year}-${month}-${date} ${hours}:${minutes}`;
+};
 
 const handleVideoInput = async () => {
   const videoVal = form.video || '';
