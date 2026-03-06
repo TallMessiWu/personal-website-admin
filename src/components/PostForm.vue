@@ -366,6 +366,8 @@ const submitForm = async () => {
       } finally {
         submitting.value = false;
       }
+    } else {
+      ElMessage.warning('请补充必填项（如标题和日期等）');
     }
   });
 };
