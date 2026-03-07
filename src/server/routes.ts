@@ -132,6 +132,14 @@ export function setupRoutes(app: Express) {
 
       const result = await db.collection('posts').doc(id).remove();
 
+      // 同步清理合集中的引用
+      const _ = db.command;
+      await db.collection('collections').where({
+        posts: id
+      }).update({
+        posts: _.pull(id)
+      });
+
       // 清理云存储中的所有关联文件
       const toDelete = collectFileIDs(oldImages);
       if (toDelete.length > 0) {
