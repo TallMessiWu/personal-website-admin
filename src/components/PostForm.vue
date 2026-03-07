@@ -93,6 +93,32 @@
 
     <!-- 隐藏的文件选择器 -->
     <input type="file" ref="fileInput" style="display: none" @change="handleFileSelected" />
+
+    <!-- 上传进度对话框 -->
+    <el-dialog
+      v-model="showProgress"
+      title="正在提交..."
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      width="400px"
+      append-to-body
+    >
+      <div class="progress-container">
+        <div class="step-text">{{ currentStepText }}</div>
+        <el-progress :percentage="overallProgress" :stroke-width="15" status="success" />
+
+        <div v-if="currentFileProgress > 0" class="sub-progress">
+          <div class="sub-text">{{ currentFileName }} (传输中)</div>
+          <el-progress :percentage="currentFileProgress" :stroke-width="10" />
+        </div>
+
+        <div v-if="isCompressing" class="sub-progress">
+          <div class="sub-text">视频码率过高，正在云端压缩中...</div>
+          <el-progress :percentage="compressProgress" :stroke-width="10" color="#67c23a" />
+        </div>
+      </div>
+    </el-dialog>
   </el-form>
 </template>
 
@@ -110,6 +136,15 @@ const emit = defineEmits(['saved', 'cancel']);
 
 const formRef = ref<FormInstance>();
 const submitting = ref(false);
+
+// 进度条相关
+const showProgress = ref(false);
+const overallProgress = ref(0);
+const currentStepText = ref('');
+const currentFileName = ref('');
+const currentFileProgress = ref(0);
+const isCompressing = ref(false);
+const compressProgress = ref(0);
 
 const form = reactive<Post>({
   title: '',
@@ -283,93 +318,126 @@ const submitForm = async () => {
   await formRef.value.validate(async (valid) => {
     if (valid) {
       submitting.value = true;
+      showProgress.value = true;
+      overallProgress.value = 0;
+      currentStepText.value = '准备上传...';
+
       try {
-        // 先处理所有待上传的文件
+        // 1. 统计需要上传的任务总数
+        let totalTasks = 0;
+        if (form.images) {
+          form.images.forEach(item => {
+            // 原图上传任务
+            if (item._rawImageFile) totalTasks += 1;
+            // 视频任务：对于 Live Photo，只要有原图就意味着会提取出一个视频；或者本身有手动选择的视频
+            if ((item.isLivePhoto && item._rawImageFile) || item._rawVideoFile) totalTasks += 1;
+          });
+        }
+
+        let completedTasks = 0;
+        const updateOverall = () => {
+          overallProgress.value = Math.round((completedTasks / (totalTasks || 1)) * 100);
+        };
+
+        // 2. 处理文件上传
         if (form.images && form.images.length > 0) {
           for (let i = 0; i < form.images.length; i++) {
             const item = form.images[i];
             if (!item) continue;
 
-            // 如果勾选了 Live Photo，尝试从原图中提取视频
+            const clientId = `upload_${Date.now()}_${i}`;
+
+            // --- 提取 Live Photo ---
             if (item.isLivePhoto && item._rawImageFile) {
-              ElMessage.info(`正在尝试提取第 ${i + 1} 项的 Live Photo 视频...`);
+              currentStepText.value = `解析第 ${i + 1} 项实况素材...`;
               const buffer = await item._rawImageFile.arrayBuffer();
               const view = new Uint8Array(buffer);
               const ftypPattern = [0x66, 0x74, 0x79, 0x70];
               let signatureIdx = -1;
-
               for (let j = 0; j < view.length - 3; j++) {
-                if (
-                  view[j] === ftypPattern[0] &&
-                  view[j + 1] === ftypPattern[1] &&
-                  view[j + 2] === ftypPattern[2] &&
-                  view[j + 3] === ftypPattern[3]
-                ) {
-                  signatureIdx = j;
-                  break;
+                if (view[j] === ftypPattern[0] && view[j + 1] === ftypPattern[1] &&
+                    view[j + 2] === ftypPattern[2] && view[j + 3] === ftypPattern[3]) {
+                  signatureIdx = j; break;
                 }
               }
-
-              if (signatureIdx === -1) {
-                throw new Error(`第 ${i + 1} 项未检测到隐藏视频，这可能只是一张普通的图片。`);
+              if (signatureIdx !== -1) {
+                const videoStartIdx = signatureIdx - 4;
+                const imageBlob = new Blob([buffer.slice(0, videoStartIdx)], { type: item._rawImageFile.type || 'image/jpeg' });
+                const videoBlob = new Blob([buffer.slice(videoStartIdx)], { type: 'video/mp4' });
+                item._rawImageFile = new File([imageBlob], item._rawImageFile.name, { type: item._rawImageFile.type || 'image/jpeg' });
+                item._rawVideoFile = new File([videoBlob], item._rawImageFile.name.replace(/\.[^/.]+$/, "") + "_live.mp4", { type: 'video/mp4' });
               }
-
-              const videoStartIdx = signatureIdx - 4;
-              const imageBuffer = buffer.slice(0, videoStartIdx);
-              const videoBuffer = buffer.slice(videoStartIdx);
-
-              const imageBlob = new Blob([imageBuffer], { type: item._rawImageFile.type || 'image/jpeg' });
-              const videoBlob = new Blob([videoBuffer], { type: 'video/mp4' });
-
-              item._rawImageFile = new File([imageBlob], item._rawImageFile.name, { type: item._rawImageFile.type || 'image/jpeg' });
-              item._rawVideoFile = new File([videoBlob], item._rawImageFile.name.replace(/\.[^/.]+$/, "") + "_live.mp4", { type: 'video/mp4' });
-              item.video = `[待上传] ${item._rawVideoFile.name}`;
             }
 
-            // 处理原图及缩略图
+            // --- 上传图片 ---
             if (item._rawImageFile) {
-              const file = item._rawImageFile;
-              ElMessage.info(`正在上传第 ${i + 1} 项的原图...`);
-              const fileID = await api.uploadFile(file, 'image');
+              currentFileName.value = item._rawImageFile.name;
+              currentStepText.value = `上传第 ${i + 1} 项图片...`;
+              const fileID = await api.uploadFile(item._rawImageFile, 'image', undefined, (p) => {
+                currentFileProgress.value = p;
+              });
               item.image = fileID;
 
               if (!item.thumbnail || item.thumbnail.startsWith('[待上传]')) {
-                // 如果原图小于 1MB，直接用原图 fileID 当缩略图
-                if (file.size < 1024 * 1024) {
+                if (item._rawImageFile.size < 1024 * 1024) {
                   item.thumbnail = fileID;
                 } else {
-                  ElMessage.info(`正在本地生成并上传第 ${i + 1} 项的缩略图...`);
-                  try {
-                    const compressedFile = await compressImageLocal(file);
-                    const thumbFileID = await api.uploadFile(compressedFile, 'thumbnail');
-                    item.thumbnail = thumbFileID;
-                  } catch (err: any) {
-                    ElMessage.warning(`第 ${i + 1} 项的缩略图生成失败: ` + err.message);
-                    item.thumbnail = ''; // 失败则置空
-                  }
+                  currentStepText.value = `生成第 ${i + 1} 项缩略图...`;
+                  const compressedFile = await compressImageLocal(item._rawImageFile);
+                  const thumbID = await api.uploadFile(compressedFile, 'thumbnail');
+                  item.thumbnail = thumbID;
                 }
               }
+              completedTasks++;
+              updateOverall();
+              currentFileProgress.value = 0;
               delete item._rawImageFile;
             }
 
-            // 处理视频
+            // --- 上传视频 (含压缩逻辑) ---
             if (item._rawVideoFile) {
-              const file = item._rawVideoFile;
-              ElMessage.info(`正在上传第 ${i + 1} 项的视频...`);
-              const fileID = await api.uploadFile(file, 'video');
+              currentFileName.value = item._rawVideoFile.name;
+              currentStepText.value = `上传第 ${i + 1} 项视频...`;
+              isCompressing.value = false;
+              compressProgress.value = 0;
+
+              // 发起上传并监控进度
+              const uploadPromise = api.uploadFile(item._rawVideoFile, 'video', clientId, (p) => {
+                currentFileProgress.value = p;
+                if (p === 100) {
+                  // 进入压缩轮询阶段
+                  currentStepText.value = '视频处理中...';
+                }
+              });
+
+              // 开启定时轮询压缩进度
+              const pollInterval = setInterval(async () => {
+                const p = await api.getVideoProgress(clientId);
+                if (p > 0) {
+                  isCompressing.value = true;
+                  compressProgress.value = p;
+                }
+              }, 800);
+
+              const fileID = await uploadPromise;
+              clearInterval(pollInterval);
+
               item.video = fileID;
+              completedTasks++;
+              updateOverall();
+              currentFileProgress.value = 0;
+              isCompressing.value = false;
               delete item._rawVideoFile;
             }
           }
         }
 
+        currentStepText.value = '同步数据库...';
         const payload = { ...form };
         if (payload._id) {
-          // Edit
           await api.updatePost(payload._id, payload);
           ElMessage.success('更新成功');
         } else {
-          // Create
           await api.createPost(payload);
           ElMessage.success('发布成功');
         }
@@ -378,6 +446,11 @@ const submitForm = async () => {
         ElMessage.error('保存失败: ' + e.message);
       } finally {
         submitting.value = false;
+        showProgress.value = false;
+        // 重置状态
+        overallProgress.value = 0;
+        currentFileProgress.value = 0;
+        isCompressing.value = false;
       }
     } else {
       ElMessage.warning('请补充必填项（如标题和日期等）');
@@ -410,5 +483,24 @@ const submitForm = async () => {
 .card-actions {
   display: flex;
   gap: 4px;
+}
+.progress-container {
+  padding: 10px 0;
+}
+.step-text {
+  margin-bottom: 15px;
+  font-weight: bold;
+  color: #409eff;
+  text-align: center;
+}
+.sub-progress {
+  margin-top: 20px;
+  border-top: 1px dashed #eee;
+  padding-top: 15px;
+}
+.sub-text {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
 }
 </style>

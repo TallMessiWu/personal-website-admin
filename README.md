@@ -42,6 +42,12 @@
 └── vite.config.ts        # Vite 配置文件
 ```
 
+### 2. 环境要求
+本项目的高码率视频处理功能依赖系统级的 `ffmpeg`。请确保已安装并将其路径添加到系统环境变量中：
+- **Windows**: `choco install ffmpeg`
+- **macOS**: `brew install ffmpeg`
+- **Linux**: `sudo apt install ffmpeg`
+
 ## 📦 安装与运行
 
 1. **安装依赖**

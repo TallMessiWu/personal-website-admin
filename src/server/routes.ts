@@ -1,6 +1,17 @@
 import type { Express, Request, Response } from 'express';
 import multer from 'multer';
 import { cloudbase, db } from './cloudbase';
+import ffmpeg from 'fluent-ffmpeg';
+import { promisify } from 'util';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+
+// 获取视频信息
+const ffprobe = promisify(ffmpeg.ffprobe);
+
+// 全局存储压缩进度 (jobId -> percent)
+const compressionProgress = new Map<string, number>();
 
 // 使用内存存储接收上传的文件
 const upload = multer({ storage: multer.memoryStorage() });
@@ -295,6 +306,13 @@ export function setupRoutes(app: Express) {
     }
   });
 
+  // 获取视频压缩进度
+  app.get('/upload-progress/:id', (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    const progress = compressionProgress.get(id) || 0;
+    res.json({ success: true, progress });
+  });
+
   // 解析B站视频信息
   app.get('/bilibili', async (req: Request, res: Response): Promise<any> => {
     try {
@@ -335,19 +353,85 @@ export function setupRoutes(app: Express) {
         return res.status(400).json({ success: false, error: 'No file uploaded' });
       }
 
+      let fileBuffer = req.file.buffer;
       const file = req.file;
       let cloudDir = 'posts/images';
-      if (req.body.type === 'video') cloudDir = 'posts/videos';
+      const isVideo = req.body.type === 'video';
+
+      if (isVideo) cloudDir = 'posts/videos';
       else if (req.body.type === 'thumbnail') cloudDir = 'posts/thumbnails';
       else if (req.body.type === 'collection') cloudDir = 'collections';
+
       const ext = file.originalname.split('.').pop();
       const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const cloudPath = `${cloudDir}/${filename}`;
+      const clientId = req.body.clientId; // 前端传来的追踪 ID
+
+      if (isVideo) {
+        const tempInputPath = path.join(os.tmpdir(), `input_${filename}`);
+        const tempOutputPath = path.join(os.tmpdir(), `output_${filename}`);
+
+        try {
+          // 将 buffer 写入临时文件供 ffmpeg 处理
+          fs.writeFileSync(tempInputPath, fileBuffer);
+
+          // 获取视频信息
+          const metadata: any = await ffprobe(tempInputPath);
+          const bitrate = metadata.format.bit_rate; // bps
+          // 18000 kbps = 18,000,000 bps
+          if (bitrate && parseInt(bitrate) > 18000000) {
+            if (clientId) compressionProgress.set(clientId, 0); // 初始化进度
+
+            await new Promise((resolve, reject) => {
+              ffmpeg(tempInputPath)
+                .outputOptions([
+                  '-b:v 18000k', // 限制视频码率
+                  '-maxrate 18000k',
+                  '-bufsize 36000k'
+                ])
+                .output(tempOutputPath)
+                .on('progress', (progress) => {
+                  if (progress.percent && clientId) {
+                    compressionProgress.set(clientId, Math.floor(progress.percent));
+                  }
+                })
+                .on('end', () => {
+                  if (clientId) compressionProgress.set(clientId, 100);
+                  resolve(null);
+                })
+                .on('error', (err) => {
+                  if (clientId) compressionProgress.delete(clientId);
+                  reject(err);
+                })
+                .run();
+            });
+
+            // 读取压缩后的文件
+            fileBuffer = fs.readFileSync(tempOutputPath);
+            if (clientId) compressionProgress.delete(clientId); // 处理完成后删除进度信息
+          }
+        } catch (err: any) {
+          console.error('Error during video processing:', err.message);
+          // 如果处理失败（如没装 ffmpeg），则提示用户，但不强推
+          // 可以在这里决定是报错还是继续原始上传
+          // 考虑到用户需求是“压缩”，如果环境没有 ffmpeg，建议报错提示
+          if (err.message.includes('ffmpeg') || err.message.includes('spawn')) {
+             return res.status(500).json({
+               success: false,
+               error: '服务器未安装 FFmpeg，无法处理高码率视频。请确保环境已正确配置。'
+             });
+          }
+        } finally {
+          // 清理临时文件
+          if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
+          if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
+        }
+      }
 
       // 使用 buffer 作为 fileContent
       const uploadResult = await cloudbase.uploadFile({
         cloudPath,
-        fileContent: file.buffer,
+        fileContent: fileBuffer,
       });
 
       res.json({ success: true, fileID: uploadResult.fileID });

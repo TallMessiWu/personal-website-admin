@@ -42,6 +42,12 @@ This project is a personal website admin dashboard and data management system bu
 └── vite.config.ts        # Vite configuration
 ```
 
+### 2. Environment Requirements
+The high-bitrate video processing feature depends on system-level `ffmpeg`. Please ensure it is installed and added to your system's PATH:
+- **Windows**: `choco install ffmpeg`
+- **macOS**: `brew install ffmpeg`
+- **Linux**: `sudo apt install ffmpeg`
+
 ## 📦 Installation & Setup
 
 1. **Install dependencies**
