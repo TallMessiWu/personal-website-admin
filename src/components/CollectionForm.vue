@@ -5,6 +5,10 @@
       <el-input v-model="form.name" placeholder="合集名称" />
     </el-form-item>
 
+    <el-form-item label="描述" prop="description">
+      <el-input v-model="form.description" type="textarea" :rows="3" placeholder="合集描述" />
+    </el-form-item>
+
     <el-form-item label="置顶">
       <el-switch v-model="form.pinned" />
     </el-form-item>
@@ -133,6 +137,7 @@ const pendingSelection = ref<Post[]>([]);
 
 const form = reactive<Collection & { _rawThumbnailFile?: File }>({
   name: '',
+  description: '',
   thumbnail: '',
   posts: [],
   pinned: false,
@@ -290,6 +295,7 @@ const submitForm = async () => {
 
         const payload: any = {
           name: form.name,
+          description: form.description,
           thumbnail: form.thumbnail,
           posts: form.posts,
           pinned: !!form.pinned,

@@ -18,6 +18,7 @@
           {{ row.name }}
         </template>
       </el-table-column>
+      <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
       <el-table-column label="封面" width="100" align="center">
         <template #default="{ row }">
           <el-image

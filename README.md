@@ -16,6 +16,14 @@
 - [![Gitee](https://img.shields.io/badge/Gitee-tallmessiwu%2Fpersonal--website--admin-C71D23?logo=gitee)](https://gitee.com/tallmessiwu/personal-website-admin)
 - [![GitHub](https://img.shields.io/badge/GitHub-TallMessiWu%2Fpersonal--website--admin-181717?logo=github)](https://github.com/TallMessiWu/personal-website-admin)
 
+## ✨ 功能特性
+- **动态内容管理**: 直观地管理图片、视频和文本内容。
+- **合集系统**: 支持将内容分门别类，支持自定义合集标题、**描述**和封面。
+- **智能视频处理**: 集成 FFmpeg 自动检测并压缩高码率视频，优化加载速度。
+- **BiliBili 集成**: 快捷解析并导入 B 站视频元数据（标题、封面、发布日期）。
+- **多语言预览**: 支持内容的国际化多语言管理。
+- **置顶逻辑**: 关键合集或内容一键置顶展示。
+
 ## 🛠️ 技术栈
 - **核心框架**: [Vue 3](https://vuejs.org/) (Composition API / `<script setup>`)
 - **类型系统**: [TypeScript](https://www.typescriptlang.org/)
@@ -42,7 +50,7 @@
 └── vite.config.ts        # Vite 配置文件
 ```
 
-### 2. 环境要求
+## ⚙️ 环境要求
 本项目的高码率视频处理功能依赖系统级的 `ffmpeg`。请确保已安装并将其路径添加到系统环境变量中：
 - **Windows**: `choco install ffmpeg`
 - **macOS**: `brew install ffmpeg`

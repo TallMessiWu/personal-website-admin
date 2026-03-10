@@ -16,6 +16,14 @@ This project is a personal website admin dashboard and data management system bu
 - [![Gitee](https://img.shields.io/badge/Gitee-tallmessiwu%2Fpersonal--website--admin-C71D23?logo=gitee)](https://gitee.com/tallmessiwu/personal-website-admin)
 - [![GitHub](https://img.shields.io/badge/GitHub-TallMessiWu%2Fpersonal--website--admin-181717?logo=github)](https://github.com/TallMessiWu/personal-website-admin)
 
+## ✨ Key Features
+- **Dynamic Content Management**: Intuitive management of images, videos, and text content.
+- **Collection System**: Categorize content with custom collection titles, **descriptions**, and covers.
+- **Smart Video Processing**: Integrated FFmpeg for automatic high-bitrate video detection and compression.
+- **BiliBili Integration**: Quickly parse and import Bilibili video metadata (title, cover, pubdate).
+- **Multilingual Support**: Internationalization management for website content.
+- **Pinned Items**: One-click pinning for crucial collections or posts.
+
 ## 🛠️ Tech Stack
 - **Core Framework**: [Vue 3](https://vuejs.org/) (Composition API / `<script setup>`)
 - **Type System**: [TypeScript](https://www.typescriptlang.org/)
@@ -42,7 +50,7 @@ This project is a personal website admin dashboard and data management system bu
 └── vite.config.ts        # Vite configuration
 ```
 
-### 2. Environment Requirements
+## ⚙️ Environment Requirements
 The high-bitrate video processing feature depends on system-level `ffmpeg`. Please ensure it is installed and added to your system's PATH:
 - **Windows**: `choco install ffmpeg`
 - **macOS**: `brew install ffmpeg`

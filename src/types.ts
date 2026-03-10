@@ -24,6 +24,7 @@ export interface Post {
 export interface Collection {
   _id?: string;
   name: string;
+  description?: string;
   thumbnail: string;
   posts: string[];
   pinned?: boolean;
