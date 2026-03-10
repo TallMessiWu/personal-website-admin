@@ -42,11 +42,11 @@
         <div class="card-actions">
           <el-button :icon="ArrowUp" size="small" circle :disabled="index === 0" @click="moveImageUp(index)" />
           <el-button :icon="ArrowDown" size="small" circle :disabled="index === (form.images?.length ?? 1) - 1" @click="moveImageDown(index)" />
-          <el-button type="danger" size="small" icon="Delete" circle @click="removeImage(index)" />
+          <el-button type="danger" size="small" icon="Delete" circle :disabled="hasMainVideo" @click="removeImage(index)" />
         </div>
       </div>
       <el-form-item label="Live Photo">
-        <el-checkbox v-model="item.isLivePhoto">包含实况视频 (Live Photo)，提交时将自动提取</el-checkbox>
+        <el-checkbox v-model="item.isLivePhoto" :disabled="hasMainVideo">包含实况视频 (Live Photo)，提交时将自动提取</el-checkbox>
       </el-form-item>
       <el-form-item label="原图 (高清)">
         <el-input v-model="item.image" placeholder="原图链接或 fileID" />
@@ -78,14 +78,14 @@
       </el-form-item>
 
       <el-form-item label="Live视频" v-if="!item.isLivePhoto">
-        <el-input v-model="item.video" placeholder="Live Photo 短视频链接或 fileID" />
-        <el-button style="margin-top:5px" @click="triggerUpload(index, 'video', 'video')">
+        <el-input v-model="item.video" placeholder="Live Photo 短视频链接或 fileID" :disabled="hasMainVideo" />
+        <el-button style="margin-top:5px" :disabled="hasMainVideo" @click="triggerUpload(index, 'video', 'video')">
           选择本地视频
         </el-button>
       </el-form-item>
     </div>
 
-    <el-button type="primary" plain @click="addImageItem" style="margin-bottom: 20px;">
+    <el-button type="primary" plain :disabled="hasMainVideo" @click="addImageItem" style="margin-bottom: 20px;">
       <el-icon><Plus /></el-icon> 新增图片项
     </el-button>
 
@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, markRaw } from 'vue';
+import { ref, reactive, computed, watch, onMounted, markRaw } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, ArrowUp, ArrowDown } from '@element-plus/icons-vue';
@@ -161,6 +161,30 @@ const form = reactive<Post>({
 const rules = reactive<FormRules>({
   title: [{ required: true, message: '标题不能为空', trigger: 'blur' }],
   date: [{ required: true, message: '日期不能为空', trigger: 'change' }],
+});
+
+// 主视频非空时，图片项必须有且只有一个（用于封面/缩略图），禁止增删
+const hasMainVideo = computed(() => !!form.video && form.video.trim().length > 0);
+
+// 监听主视频变化：有视频时自动裁剪图片项到只剩一个，并清空 Live Photo
+watch(hasMainVideo, (has) => {
+  if (has && form.images) {
+    // 只保留第一个图片项，删除多余的
+    if (form.images.length > 1) {
+      form.images.splice(1);
+    }
+    // 确保至少有一个
+    if (form.images.length === 0) {
+      form.images.push({ image: '', thumbnail: '', video: '', isLivePhoto: false });
+    }
+    // 清空 Live Photo 相关字段
+    const first = form.images[0];
+    if (first) {
+      first.isLivePhoto = false;
+      first.video = '';
+      delete first._rawVideoFile;
+    }
+  }
 });
 
 onMounted(() => {
