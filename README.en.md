@@ -19,7 +19,8 @@ This project is a personal website admin dashboard and data management system bu
 ## ✨ Key Features
 - **Dynamic Content Management**: Intuitive management of images, videos, and text content.
 - **Collection System**: Categorize content with custom collection titles, **descriptions**, and covers.
-- **Smart Video Processing**: Integrated FFmpeg for automatic high-bitrate video detection and compression.
+- **Local Video Upload**: Upload local video files directly, with automatic first-frame extraction for cover thumbnails.
+- **Smart Video Processing**: Integrated FFmpeg for automatic high-bitrate detection and compression, enforcing H.264/AAC MP4 output with `faststart` optimization for instant streaming playback.
 - **BiliBili Integration**: Quickly parse and import Bilibili video metadata (title, cover, pubdate).
 - **Multilingual Support**: Internationalization management for website content.
 - **Pinned Items**: One-click pinning for crucial collections or posts.
@@ -51,7 +52,7 @@ This project is a personal website admin dashboard and data management system bu
 ```
 
 ## ⚙️ Environment Requirements
-The high-bitrate video processing feature depends on system-level `ffmpeg`. Please ensure it is installed and added to your system's PATH:
+The video processing features (high-bitrate compression, format transcoding, streaming optimization) depend on system-level `ffmpeg`. Please ensure it is installed and added to your system's PATH:
 - **Windows**: `choco install ffmpeg`
 - **macOS**: `brew install ffmpeg`
 - **Linux**: `sudo apt install ffmpeg`

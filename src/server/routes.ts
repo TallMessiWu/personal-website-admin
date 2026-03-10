@@ -32,6 +32,7 @@ export function setupRoutes(app: Express) {
       // 收集所有 images 中的 fileID 并批量解析为展示用 URL（保留原始 fileID 不变）
       const fileIDSet = new Set<string>();
       for (const post of data as any[]) {
+        if (post.video && post.video.startsWith('cloud://')) fileIDSet.add(post.video);
         if (post.images && Array.isArray(post.images)) {
           for (const img of post.images) {
             if (img.thumbnail && img.thumbnail.startsWith('cloud://')) fileIDSet.add(img.thumbnail);
@@ -45,6 +46,10 @@ export function setupRoutes(app: Express) {
           urlResult.fileList.map((f: any) => [f.fileID, f.tempFileURL])
         );
         for (const post of data as any[]) {
+          // 写入展示专用字段
+          if (post.video && post.video.startsWith('cloud://')) {
+            post._videoUrl = urlMap.get(post.video) || post.video || '';
+          }
           if (post.images && Array.isArray(post.images)) {
             for (const img of post.images) {
               // 写入展示专用字段，不覆盖原始 fileID
@@ -56,6 +61,9 @@ export function setupRoutes(app: Express) {
       } else {
         // 没有 fileID 需要解析时，也把展示字段设为原值
         for (const post of data as any[]) {
+          if (post.video) {
+            post._videoUrl = post.video || '';
+          }
           if (post.images && Array.isArray(post.images)) {
             for (const img of post.images) {
               img._imageUrl = img.image || '';
@@ -103,13 +111,19 @@ export function setupRoutes(app: Express) {
 
       // 获取旧文档
       const oldDoc = await db.collection('posts').doc(id).get();
-      const oldImages = oldDoc.data?.[0]?.images || [];
+      const oldDocData = oldDoc.data?.[0];
+      const oldImages = oldDocData?.images || [];
+      const oldVideo = oldDocData?.video || '';
 
       const result = await db.collection('posts').doc(id).update(data);
 
       // 对比新旧 fileID，删除不再被引用的
       const oldIDs = new Set(collectFileIDs(oldImages));
+      if (oldVideo && oldVideo.startsWith('cloud://')) oldIDs.add(oldVideo);
+
       const newIDs = new Set(collectFileIDs(data.images || []));
+      if (data.video && data.video.startsWith('cloud://')) newIDs.add(data.video);
+
       const toDelete = [...oldIDs].filter(fid => !newIDs.has(fid));
       if (toDelete.length > 0) {
         cloudbase.deleteFile({ fileList: toDelete }).catch(() => {});
@@ -128,7 +142,9 @@ export function setupRoutes(app: Express) {
 
       // 先获取文档，用于清理文件
       const oldDoc = await db.collection('posts').doc(id).get();
-      const oldImages = oldDoc.data?.[0]?.images || [];
+      const oldDocData = oldDoc.data?.[0];
+      const oldImages = oldDocData?.images || [];
+      const oldVideo = oldDocData?.video || '';
 
       const result = await db.collection('posts').doc(id).remove();
 
@@ -142,6 +158,8 @@ export function setupRoutes(app: Express) {
 
       // 清理云存储中的所有关联文件
       const toDelete = collectFileIDs(oldImages);
+      if (oldVideo && oldVideo.startsWith('cloud://')) toDelete.push(oldVideo);
+
       if (toDelete.length > 0) {
         cloudbase.deleteFile({ fileList: toDelete }).catch(() => {});
       }
@@ -370,7 +388,8 @@ export function setupRoutes(app: Express) {
       else if (req.body.type === 'thumbnail') cloudDir = 'posts/thumbnails';
       else if (req.body.type === 'collection') cloudDir = 'collections';
 
-      const ext = file.originalname.split('.').pop();
+      // 视频文件强制统一输出为 .mp4 以保证最佳的 Web 兼容性
+      const ext = isVideo ? 'mp4' : file.originalname.split('.').pop();
       const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const cloudPath = `${cloudDir}/${filename}`;
       const clientId = req.body.clientId; // 前端传来的追踪 ID
@@ -385,39 +404,57 @@ export function setupRoutes(app: Express) {
 
           // 获取视频信息
           const metadata: any = await ffprobe(tempInputPath);
-          const bitrate = metadata.format.bit_rate; // bps
-          // 18000 kbps = 18,000,000 bps
-          if (bitrate && parseInt(bitrate) > 18000000) {
-            if (clientId) compressionProgress.set(clientId, 0); // 初始化进度
+          const bitrateRaw = metadata.format.bit_rate; // bps
+          const videoStream = metadata.streams?.find((s: any) => s.codec_type === 'video');
+          const videoCodec = videoStream?.codec_name;
+          const bitrate = bitrateRaw ? parseInt(bitrateRaw) : Number.MAX_SAFE_INTEGER;
 
-            await new Promise((resolve, reject) => {
-              ffmpeg(tempInputPath)
-                .outputOptions([
-                  '-b:v 18000k', // 限制视频码率
-                  '-maxrate 18000k',
-                  '-bufsize 36000k'
-                ])
-                .output(tempOutputPath)
-                .on('progress', (progress) => {
-                  if (progress.percent && clientId) {
-                    compressionProgress.set(clientId, Math.floor(progress.percent));
-                  }
-                })
-                .on('end', () => {
-                  if (clientId) compressionProgress.set(clientId, 100);
-                  resolve(null);
-                })
-                .on('error', (err) => {
-                  if (clientId) compressionProgress.delete(clientId);
-                  reject(err);
-                })
-                .run();
-            });
+          const MAX_BITRATE = 18000000;
 
-            // 读取压缩后的文件
-            fileBuffer = fs.readFileSync(tempOutputPath);
-            if (clientId) compressionProgress.delete(clientId); // 处理完成后删除进度信息
-          }
+          if (clientId) compressionProgress.set(clientId, 0); // 初始化进度
+
+          await new Promise((resolve, reject) => {
+            const options = [
+              '-movflags +faststart' // 核心优化：将 moov atom (元数据) 移至文件头部，避免必须下完整个视频才能开始播放
+            ];
+
+            // 如果码率超出限制、或者编码不是高兼容性的 h264，则强制重编码进行压缩并统一格式
+            if (bitrate > MAX_BITRATE || videoCodec !== 'h264') {
+              options.push(
+                '-c:v libx264',   // 兼容 Web 的视频编码
+                '-c:a aac',       // 兼容 Web 的音频编码
+                '-b:v 18000k',    // 限制码率
+                '-maxrate 18000k',
+                '-bufsize 36000k',
+                '-preset medium'  // 平衡压缩速度与产物体积
+              );
+            } else {
+              // 否则只要做简单的格式封装 (mp4) 和 moov 数据前置即可，无需耗时重编码
+              options.push('-c copy');
+            }
+
+            ffmpeg(tempInputPath)
+              .outputOptions(options)
+              .output(tempOutputPath)
+              .on('progress', (progress) => {
+                if (progress.percent && clientId) {
+                  compressionProgress.set(clientId, Math.floor(progress.percent));
+                }
+              })
+              .on('end', () => {
+                if (clientId) compressionProgress.set(clientId, 100);
+                resolve(null);
+              })
+              .on('error', (err) => {
+                if (clientId) compressionProgress.delete(clientId);
+                reject(err);
+              })
+              .run();
+          });
+
+          // 读取处理后必定更利于播放的 mp4 文件
+          fileBuffer = fs.readFileSync(tempOutputPath);
+          if (clientId) compressionProgress.delete(clientId); // 处理完成后删除进度信息
         } catch (err: any) {
           console.error('Error during video processing:', err.message);
           // 如果处理失败（如没装 ffmpeg），则提示用户，但不强推

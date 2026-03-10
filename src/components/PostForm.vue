@@ -27,8 +27,11 @@
       <el-switch v-model="form.pinned" />
     </el-form-item>
 
-    <el-form-item label="外部视频" prop="video">
-      <el-input v-model="form.video" placeholder="如 B站 BV 号或完整链接" @blur="handleVideoInput" />
+    <el-form-item label="主视频" prop="video">
+      <el-input v-model="form.video" placeholder="如 B站 BV 号或完整链接，或是上方本地方上传视频后得到的 fileID" @blur="handleVideoInput" />
+      <el-button style="margin-top:5px" @click="triggerUpload(-1, 'mainVideo', 'video')">
+        选择本地主视频
+      </el-button>
     </el-form-item>
 
     <el-divider>图文混排 / Live Photo 配置</el-divider>
@@ -129,7 +132,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, ArrowUp, ArrowDown } from '@element-plus/icons-vue';
 import type { Post, ImageItem } from '../types';
 import { api } from '../api';
-import { compressImageLocal } from '../utils';
+import { compressImageLocal, extractVideoFrame } from '../utils';
 
 const props = defineProps<{ initialData?: Post | null }>();
 const emit = defineEmits(['saved', 'cancel']);
@@ -259,9 +262,11 @@ const removeImage = (index: number) => {
 // 上传相关状态
 const fileInput = ref<HTMLInputElement>();
 const uploadingIndex = ref(''); // e.g. "0-image" or "0-video"
-let currentUploadTarget: { index: number, field: 'image' | 'video', fileType: 'image' | 'video' } | null = null;
+// 独立变量支持表单提交时一并上传的主视频文件
+let _rawMainVideoFile: File | null = null;
+let currentUploadTarget: { index: number, field: 'image' | 'video' | 'mainVideo', fileType: 'image' | 'video' } | null = null;
 
-const triggerUpload = (index: number, field: 'image' | 'video', fileType: 'image' | 'video') => {
+const triggerUpload = (index: number, field: 'image' | 'video' | 'mainVideo', fileType: 'image' | 'video') => {
   currentUploadTarget = { index, field, fileType };
   if (fileInput.value) {
     fileInput.value.accept = fileType === 'image' ? 'image/*' : 'video/*';
@@ -278,23 +283,46 @@ const handleFileSelected = async (e: Event) => {
   const file = target.files[0] as File;
   const { index, field, fileType } = currentUploadTarget;
 
-  if (!form.images) form.images = [];
-  const imgs = form.images as ImageItem[];
-  const item = imgs[index];
-  if (!item) {
-    target.value = '';
-    currentUploadTarget = null;
-    return;
-  }
+  if (field === 'mainVideo' && fileType === 'video') {
+    _rawMainVideoFile = markRaw(file);
+    form.video = `[待上传] ${file.name}`;
+    ElMessage.success('已选择主视频，提交时将自动上传');
 
-  if (fileType === 'image' && field === 'image') {
-    item._rawImageFile = markRaw(file);
-    item.image = `[待上传] ${file.name}`;
-    ElMessage.success('已选择原图，提交时将自动上传并压缩');
-  } else if (field === 'video') {
-    item._rawVideoFile = markRaw(file);
-    item.video = `[待上传] ${file.name}`;
-    ElMessage.success('已选择视频，提交时将自动上传');
+    // 自动抽取首帧
+    try {
+      const frameFile = await extractVideoFrame(file, 0.1);
+      if (!form.images) form.images = [];
+      if (form.images.length === 0) {
+        form.images.push({ image: '', thumbnail: '', video: '', isLivePhoto: false });
+      }
+      if (form.images[0]) {
+        form.images[0]._rawImageFile = markRaw(frameFile);
+        form.images[0].image = `[自动封面提取] ${frameFile.name}`;
+      }
+      ElMessage.success('已自动提取视频首帧作为首图封面，提交时将和图文一起压缩上传');
+    } catch (e: any) {
+      ElMessage.warning(`提取主视频首帧失败：${e.message}`);
+    }
+  } else {
+    // 处理 images 内的上传逻辑
+    if (!form.images) form.images = [];
+    const imgs = form.images as ImageItem[];
+    const item = imgs[index];
+    if (!item) {
+      target.value = '';
+      currentUploadTarget = null;
+      return;
+    }
+
+    if (fileType === 'image' && field === 'image') {
+      item._rawImageFile = markRaw(file);
+      item.image = `[待上传] ${file.name}`;
+      ElMessage.success('已选择原图，提交时将自动上传并压缩');
+    } else if (field === 'video') {
+      item._rawVideoFile = markRaw(file);
+      item.video = `[待上传] ${file.name}`;
+      ElMessage.success('已选择视频，提交时将自动上传');
+    }
   }
 
   uploadingIndex.value = '';
@@ -325,6 +353,7 @@ const submitForm = async () => {
       try {
         // 1. 统计需要上传的任务总数
         let totalTasks = 0;
+        if (_rawMainVideoFile) totalTasks += 1;
         if (form.images) {
           form.images.forEach(item => {
             // 原图上传任务
@@ -339,7 +368,41 @@ const submitForm = async () => {
           overallProgress.value = Math.round((completedTasks / (totalTasks || 1)) * 100);
         };
 
-        // 2. 处理文件上传
+        // 2. 处理主视频上传
+        if (_rawMainVideoFile) {
+          currentFileName.value = _rawMainVideoFile.name;
+          currentStepText.value = `上传主视频...`;
+          isCompressing.value = false;
+          compressProgress.value = 0;
+
+          const clientId = `upload_main_video_${Date.now()}`;
+          const uploadPromise = api.uploadFile(_rawMainVideoFile, 'video', clientId, (p) => {
+            currentFileProgress.value = p;
+            if (p === 100) {
+              currentStepText.value = '主视频处理中...';
+            }
+          });
+
+          const pollInterval = setInterval(async () => {
+            const p = await api.getVideoProgress(clientId);
+            if (p > 0) {
+              isCompressing.value = true;
+              compressProgress.value = p;
+            }
+          }, 800);
+
+          const fileID = await uploadPromise;
+          clearInterval(pollInterval);
+          form.video = fileID;
+          _rawMainVideoFile = null;
+
+          completedTasks++;
+          updateOverall();
+          currentFileProgress.value = 0;
+          isCompressing.value = false;
+        }
+
+        // 3. 处理图文文件上传
         if (form.images && form.images.length > 0) {
           for (let i = 0; i < form.images.length; i++) {
             const item = form.images[i];
