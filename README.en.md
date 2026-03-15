@@ -30,25 +30,38 @@ This project is a personal website admin dashboard and data management system bu
 - **Type System**: [TypeScript](https://www.typescriptlang.org/)
 - **Build Tool**: [Vite](https://vitejs.dev/)
 - **UI Component Library**: [Element Plus](https://element-plus.org/)
-- **Backend Services**: [@cloudbase/node-sdk](https://docs.cloudbase.net/api-reference/server/node/sdk/introduce)
+- **Embedded Backend**: [Express.js](https://expressjs.com/) (mounted at `/api` via Vite plugin) + [Multer](https://github.com/expressjs/multer) (file uploads)
+- **Cloud Services**: [@cloudbase/node-sdk](https://docs.cloudbase.net/api-reference/server/node/sdk/introduce) (Tencent CloudBase - Database & Cloud Storage)
+- **Media Processing**: [fluent-ffmpeg](https://github.com/fluent-ffmpeg/node-fluent-ffmpeg) (video transcoding/analysis), [sharp](https://sharp.pixelplumbing.com/) (image compression)
 
 ## 📂 Project Structure
 
 ```text
 .
 ├── src/
-│   ├── components/       # UI Components (List, Form, etc.)
-│   ├── server/           # Backend Logic (Express routes, CloudBase interaction)
-│   ├── App.vue           # Root Component
-│   ├── api.ts            # Frontend API client encapsulation
-│   ├── main.ts           # Application entry point
-│   ├── types.ts          # TypeScript type definitions
-│   └── utils.ts          # Utility functions
-├── public/               # Static assets
-├── index.html            # Entry HTML
-├── package.json          # Dependencies and scripts
-├── tsconfig.json         # TypeScript configuration
-└── vite.config.ts        # Vite configuration
+│   ├── components/
+│   │   ├── CollectionForm.vue   # Collection create/edit form
+│   │   ├── CollectionList.vue   # Collection list & management
+│   │   ├── PostForm.vue         # Post create/edit form
+│   │   └── PostList.vue         # Post list & management
+│   ├── server/
+│   │   ├── cloudbase.ts         # CloudBase SDK init & database/storage operations
+│   │   ├── index.ts             # Express server entry & Vite plugin mount
+│   │   └── routes.ts            # API route definitions (upload, BiliBili, progress, etc.)
+│   ├── App.vue                  # Root Component
+│   ├── api.ts                   # Frontend API client
+│   ├── main.ts                  # Application entry point
+│   ├── types.ts                 # TypeScript type definitions
+│   └── utils.ts                 # Utility functions (image compression, etc.)
+├── public/                      # Static assets
+│   └── favicon.ico
+├── index.html                   # Entry HTML
+├── package.json                 # Dependencies and scripts
+├── tsconfig.json                # TypeScript project references
+├── tsconfig.app.json            # Frontend app TS config
+├── tsconfig.node.json           # Node-side TS config
+├── vite.config.ts               # Vite build configuration
+└── LICENSE                      # MIT License
 ```
 
 ## ⚙️ Environment Requirements

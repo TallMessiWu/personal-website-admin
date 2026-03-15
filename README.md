@@ -30,25 +30,38 @@
 - **类型系统**: [TypeScript](https://www.typescriptlang.org/)
 - **构建工具**: [Vite](https://vitejs.dev/)
 - **UI 组件库**: [Element Plus](https://element-plus.org/)
-- **后端服务**: [@cloudbase/node-sdk](https://docs.cloudbase.net/api-reference/server/node/sdk/introduce)
+- **内嵌后端**: [Express.js](https://expressjs.com/)（通过 Vite 插件挂载于 `/api`）+ [Multer](https://github.com/expressjs/multer)（文件上传）
+- **云服务**: [@cloudbase/node-sdk](https://docs.cloudbase.net/api-reference/server/node/sdk/introduce)（腾讯云开发 - 数据库 & 云存储）
+- **媒体处理**: [fluent-ffmpeg](https://github.com/fluent-ffmpeg/node-fluent-ffmpeg)（视频转码/分析）、[sharp](https://sharp.pixelplumbing.com/)（图片压缩）
 
 ## 📂 项目结构
 
 ```text
 .
 ├── src/
-│   ├── components/       # UI 组件 (List, Form 等)
-│   ├── server/           # 后端逻辑 (Express 路由, CloudBase 交互)
-│   ├── App.vue           # 根组件
-│   ├── api.ts            # 前端 API 请求封装
-│   ├── main.ts           # 应用入口
-│   ├── types.ts          # TypeScript 类型定义
-│   └── utils.ts          # 工具函数
-├── public/               # 静态资源 (图片、图标等)
-├── index.html            # 入口 HTML
-├── package.json          # 依赖配置与脚本
-├── tsconfig.json         # TypeScript 配置文件
-└── vite.config.ts        # Vite 配置文件
+│   ├── components/
+│   │   ├── CollectionForm.vue   # 合集新建/编辑表单
+│   │   ├── CollectionList.vue   # 合集列表与管理
+│   │   ├── PostForm.vue         # 帖子新建/编辑表单
+│   │   └── PostList.vue         # 帖子列表与管理
+│   ├── server/
+│   │   ├── cloudbase.ts         # CloudBase SDK 初始化与数据库/存储操作
+│   │   ├── index.ts             # Express 服务入口 & Vite 插件挂载
+│   │   └── routes.ts            # API 路由定义 (上传、BiliBili、进度查询等)
+│   ├── App.vue                  # 根组件
+│   ├── api.ts                   # 前端 API 请求封装
+│   ├── main.ts                  # 应用入口
+│   ├── types.ts                 # TypeScript 类型定义
+│   └── utils.ts                 # 工具函数 (图片压缩等)
+├── public/                      # 静态资源
+│   └── favicon.ico
+├── index.html                   # 入口 HTML
+├── package.json                 # 依赖配置与脚本
+├── tsconfig.json                # TypeScript 项目引用配置
+├── tsconfig.app.json            # 前端应用 TS 配置
+├── tsconfig.node.json           # Node 端 TS 配置
+├── vite.config.ts               # Vite 构建配置
+└── LICENSE                      # MIT 开源协议
 ```
 
 ## ⚙️ 环境要求
