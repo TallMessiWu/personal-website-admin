@@ -9,3 +9,17 @@
 - **最高优先级指令**：You MUST read the cloudbase-guidelines skill FIRST when working with CloudBase projects.
 - **工具使用 (MCP)**：充分利用 MCP 能力进行文件读写、依赖安装和接口调试。对云函数或数据库的修改必须经过实际调试验证，直到成功跑通。
 - **遇错处理**：若遇到 API 报错、权限受限或跨域问题，直接输出错误分析和解决代码，不作任何道歉。
+
+## 3. 提交规范
+提交时必须使用gitmoji-commit这个skill。
+
+## 4. 远端推送规范 (Remote Push)                                    本仓库配置了两个 remote，**每次 `git push` 必须同时推送到两个 remote**（不依赖 Gitee → GitHub 自动镜像，镜像有延迟）：
+-   `gitee`  → `https://gitee.com/tallmessiwu/personal-website-admin.git`
+-   `github` → `https://github.com/TallMessiWu/personal-website-admin.git`
+
+推送命令模板：
+```bash
+git push gitee  <branch>:<branch>
+git push github <branch>:<branch>
+```
+两条命令都要执行成功才算完成。
