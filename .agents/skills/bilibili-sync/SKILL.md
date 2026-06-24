@@ -10,6 +10,13 @@ alwaysApply: false
 
 ## 核心流程
 
+### 0. 启动开发服务器
+
+```bash
+npm run dev &
+sleep 4
+```
+
 ### 1. 获取 Bilibili 视频列表
 
 使用 `x/v2/medialist/resource/list` API（无需 wbi 签名，不会被风控）：
@@ -43,7 +50,7 @@ const MONTH_END = Math.floor(new Date(Date.UTC(year, month, 1, -8, 0, 0)).getTim
 
 const monthVideos = videos.filter(v => v.pubtime >= MONTH_START && v.pubtime < MONTH_END);
 
-// 去重并提取关键字段
+// 按 bv_id 去重，提取关键字段
 const seen = new Set();
 const unique = [];
 for (const v of monthVideos) {
@@ -66,8 +73,6 @@ NODEEOF
 
 ### 2. 检查现有帖子并去重
 
-先从 GET /api/posts 的结果中提取已有 BV 号（注意 limit=100 限制，超出部分不会返回，但不影响去重）：
-
 ```bash
 node --input-type=module << 'NODEEOF'
 const res = await fetch('http://localhost:5173/api/posts');
@@ -86,24 +91,20 @@ NODEEOF
 
 ### 3. 批量创建帖子（含封面）
 
-**关键**：帖子必须包含 `images` 数组存放封面图，否则 PostList 封面列显示为空。
-
-创建时先用 medialist API 返回的 `cover` 字段作为封面 URL，然后调用后端 `/api/bilibili?bvid=` 获取最新封面并更新：
+**关键**：PostList 封面列从 `images[0]` 读取，必须把 B站封面 URL 写入 `images` 数组。
 
 ```bash
 node --input-type=module << 'NODEEOF'
 const createdIds = [];
 
 for (const v of newVideos) {
-    // 1. 通过后端接口获取 B站 视频信息（封面、标题、简介）
+    // 通过后端接口获取 B站 视频详情（封面、标题、简介、发布时间）
     let bilibiliInfo = null;
     try {
         const infoRes = await fetch(`http://localhost:5173/api/bilibili?bvid=${v.bvid}`);
         const infoData = await infoRes.json();
         if (infoData.success) bilibiliInfo = infoData.data;
-    } catch (e) {
-        console.log(`⚠️ 获取B站信息失败: ${v.title.slice(0, 20)}`);
-    }
+    } catch (e) { /* 忽略，回退到 medialist 数据 */ }
 
     const coverUrl = bilibiliInfo?.pic || v.cover;
     const finalTitle = bilibiliInfo?.title || v.title;
@@ -116,7 +117,6 @@ for (const v of newVideos) {
           })()
         : v.date;
 
-    // 2. 创建帖子（包含封面 images 数组）
     const postData = {
         title: finalTitle,
         date: finalDate,
@@ -147,26 +147,50 @@ NODEEOF
 
 ### 4. 添加到对应合集
 
-根据视频内容分类到对应合集。当前合集映射：
+**合集 ID 必须动态查询**，不能硬编码（合集删了重建 ID 会变）。
 
-| 合集名称 | 合集 ID | 适用条件 |
-|----------|---------|----------|
-| 房东的猫！！！ | `7746c6e8699a7105015d209559928124` | 房东的猫相关视频 |
-| AI房东的猫 | `eb4974de6a0a8bf600a748890dc06b0f` | AI 生成的房东的猫视频 |
-| 随风飘扬的音符 | `1f94e7e669b000e7000c3bf56a18b97c` | 一般翻唱/音乐 |
-| 夏日入侵企画 | `1b12d66e6a0a8bf700ac36b960bcbac4` | 夏日入侵企画相关 |
-| 伴娘孟慧圆！！！ | `5dfc97d16a0a8bf700acbbb61daff6e4` | 孟慧圆相关 |
-| 游四海 | `3e45192f6a0a8bf700ab0f4f199827b4` | 旅行/音乐节现场 |
-| 关于一只叫狗狗的猫 | `0667d90f6a0a8bf700ae95e43e7dd784` | 宠物相关 |
-| 日常但不平常 | `69c95b666a0a8bf700a609d1399612d3` | 日常 vlog |
-| 一出好戏 | `071a88236a0a8bf700ab7c692a88ce05` | 戏剧/表演 |
+合集分类规则：
+
+| 合集名称 | 关键词/匹配规则 |
+|----------|----------------|
+| 房东的猫！！！ | 标题含"房东的猫"或"房猫" |
+| AI房东的猫 | 标题含"AI房东的猫"或"AI房猫" |
+| 夏日入侵企画 | 标题含"夏日入侵企画"或"夏企" |
+| 伴娘孟慧圆！！！ | 标题含"孟慧圆" |
+| 随风飘扬的音符 | 其他翻唱/音乐类 |
+| 游四海 | 旅行/音乐节现场 |
+| 关于一只叫狗狗的猫 | 宠物相关 |
+| 日常但不平常 | 日常 vlog |
+| 一出好戏 | 戏剧/表演 |
 
 ```bash
 node --input-type=module << 'NODEEOF'
-// 更新合集
+// 动态获取合集列表
 const colRes = await fetch('http://localhost:5173/api/collections');
 const colData = await colRes.json();
-const targetCol = colData.data.find(c => c.name === '合集名称');
+
+// 根据视频标题匹配合集（默认归入"房东的猫！！！"）
+function matchCollection(title) {
+    const rules = [
+        { name: 'AI房东的猫', pattern: /AI(房东的猫|房猫)/ },
+        { name: '夏日入侵企画', pattern: /(夏日入侵企画|夏企)/ },
+        { name: '伴娘孟慧圆！！！', pattern: /孟慧圆/ },
+    ];
+    for (const rule of rules) {
+        if (rule.pattern.test(title)) {
+            const col = colData.data.find(c => c.name === rule.name);
+            if (col) return col;
+        }
+    }
+    // 默认：房东的猫
+    return colData.data.find(c => c.name === '房东的猫！！！');
+}
+
+const targetCol = matchCollection('视频标题'); // 根据实际视频标题调整
+if (!targetCol) {
+    console.log('❌ 未找到目标合集');
+    return;
+}
 
 const updatedPosts = [...(targetCol.posts || []), ...createdIds.map(p => p.id)];
 await fetch(`http://localhost:5173/api/collections/${targetCol._id}`, {
@@ -174,19 +198,22 @@ await fetch(`http://localhost:5173/api/collections/${targetCol._id}`, {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ posts: updatedPosts }),
 });
-console.log(`✅ 合集 "${targetCol.name}" 更新: ${targetCol.posts.length} → ${updatedPosts.length}`);
+console.log(`✅ 合集 "${targetCol.name}": ${targetCol.posts.length} → ${updatedPosts.length}`);
 NODEEOF
 ```
 
-### 5. 验证（可选）
+### 5. 验证
 
-打开 `http://localhost:5173` 确认帖子列表封面列正常显示。
+打开 `http://localhost:5173`，确认：
+- 动态管理列表中新帖子封面正常显示
+- 合集管理中帖数正确
+- 合集封面自动回退到最新帖子封面
 
 ## 注意事项
 
-1. **必须先启动开发服务器**：`npm run dev`，确保 `http://localhost:5173` 可用。
-2. **封面必须存入 images 数组**：PostList 的 `getCover()` 从 `row.images[0]` 取封面 URL，不设 `images` 则封面列显示 `-`。
-3. **GET /api/posts 有 limit(100)**：去重时只比对前 100 条，超出部分不会扫描但通常不影响（老帖子的 BV 号不太可能和新视频重复）。
-4. **时区**：Bilibili 的 `pubtime` 是 Unix 时间戳，筛选时需转换为北京时间（UTC+8）。
-5. **视频分类**：默认所有房东的猫视频加入"房东的猫！！！"合集，其他类型视频需根据内容手动判断。
-6. **Cover URL 格式**：封面直接使用 Bilibili CDN 原始 URL（如 `http://i0.hdslb.com/bfs/archive/xxx.jpg`），不下载到 CloudBase。前端 `getCover` 会通过 fallback 链 `_imageUrl → image` 直接渲染。
+1. **必须先启动开发服务器**：`npm run dev`
+2. **封面必须存入 images 数组**：PostList 的 `getCover()` 从 `row.images[0]` 读取
+3. **合集 ID 动态查询**：不要硬编码，每次通过 `GET /api/collections` 获取最新 ID
+4. **时区**：Bilibili `pubtime` 是 Unix 时间戳，筛选时需转换为北京时间（UTC+8）
+5. **封面 URL**：直接用 B站 CDN 原始 URL，不下载到 CloudBase
+6. **更新合集时不传 thumbnail**：只传 `{ posts: [...] }`，不要传 `thumbnail` 字段。合集设计为：设了 thumbnail 用固定封面，不设则自动用最新帖子封面
