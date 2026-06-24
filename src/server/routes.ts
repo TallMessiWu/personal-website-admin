@@ -20,8 +20,15 @@ export function setupRoutes(app: Express) {
   // 获取列表 (支持按 date 降序)
   app.get('/posts', async (_req: Request, res: Response) => {
     try {
-      const result = await db.collection('posts').limit(100).get();
-      let data = result.data || [];
+      // 先查总数，再分页拉取全部数据
+      const PAGE_SIZE = 100;
+      const countResult = await db.collection('posts').count();
+      const total = countResult.total;
+      let data: any[] = [];
+      for (let offset = 0; offset < total; offset += PAGE_SIZE) {
+        const page = await db.collection('posts').skip(offset).limit(PAGE_SIZE).get();
+        data.push(...(page.data || []));
+      }
       // 本地按 pinned 和 date 排序
       data.sort((a, b) => {
         if (a.pinned && !b.pinned) return -1;
